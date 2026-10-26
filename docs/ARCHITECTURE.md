@@ -50,3 +50,11 @@ SQL 使用参数绑定。数据库通过 `SELECT ... FOR UPDATE` 锁定单个控
 所有写接口沿用 Origin / CSRF 检查。候选状态仅在服务端内存保存，30 分钟过期，最多 32 个会话；模型只提供操作建议，不能执行代码或 SQL。服务端复用 experiments.js 中可信的 experimentCapture 规则，另检查操作范围和数量。确认时用草案生成时的 revision 原子提交；并发修改会导致拒绝，防止覆盖。提交失败后前端要求刷新核对真实数据库状态。
 
 使用 OpenAI Responses API 的严格 JSON Schema，store:false。默认模型 gpt-4.1-mini 可由 OPENAI_MODEL 配置。密钥只从服务端环境与 .env 读取。官方参考：https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=responses
+
+### 事项 / 路线范围扩展
+
+`server/assistant-records.mjs` 从已有前端文件加载可信的纯业务函数 compileCapture/captureEdit/prepareDeletion，以相同数据模型验证事项变更，不执行模型生成代码。作用域为 project:ID、roadmap:ID、new-project、new-roadmap，实验仍兼容原 ID / new。按操作逐项检查归属、ID 和名称；跨事项任务和阶段会拒绝。项目笔记、关联事件和完成状态可读。新笔记/节点支持添加，其他修改限制遵守原协议。
+
+assistant 请求的幂等性由提交 requestId 负责，不为逐项内部编译累计 captureBatches。原导入批次记录保持不变。删除沿用关联清理，已完成历史保留并断开已删除引用。所有变更仍经数据库事务和快照。
+
+演示数据脚本只在显式 --apply 时追加，固定批次标记防重复，不触碰旧事项和排序；没有数据库结构迁移。
