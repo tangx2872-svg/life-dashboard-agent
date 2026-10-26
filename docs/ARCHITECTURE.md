@@ -37,3 +37,16 @@ SQL 使用参数绑定。数据库通过 `SELECT ... FOR UPDATE` 锁定单个控
 数据库连接和事务参考：
 - https://sidorares.github.io/node-mysql2/docs/documentation/promise-wrapper
 - https://dev.mysql.com/doc/refman/8.4/en/commit.html
+
+## 智能助手 B
+
+`public/assistant.js` 和 `assistant.css` 提供对话及预览，最后加载。原 JSON 导入转移到数据管理高级工具。
+
+- GET /api/assistant/status：是否配置密钥，不测试实际网络。
+- POST /api/assistant/turn：范围、消息、可选 sessionId；返回回答、澄清或草案摘要。
+- POST /api/assistant/commit：sessionId、proposalId、confirmed=true；不能上传候选状态。
+- POST /api/assistant/cancel：取消草案。
+
+所有写接口沿用 Origin / CSRF 检查。候选状态仅在服务端内存保存，30 分钟过期，最多 32 个会话；模型只提供操作建议，不能执行代码或 SQL。服务端复用 experiments.js 中可信的 experimentCapture 规则，另检查操作范围和数量。确认时用草案生成时的 revision 原子提交；并发修改会导致拒绝，防止覆盖。提交失败后前端要求刷新核对真实数据库状态。
+
+使用 OpenAI Responses API 的严格 JSON Schema，store:false。默认模型 gpt-4.1-mini 可由 OPENAI_MODEL 配置。密钥只从服务端环境与 .env 读取。官方参考：https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=responses

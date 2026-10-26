@@ -5,10 +5,12 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 import { createStore, HttpError } from './store.mjs';
 import { envelope } from './schema.mjs';
+import { createAssistant } from './assistant.mjs';
 const publicDir=fileURLToPath(new URL('../public/',import.meta.url));
 const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml'};
-export function createApp(store) {
+export function createApp(store,options={}) {
   const csrf=randomBytes(32).toString('hex');
+  const assistant=createAssistant(store,options.assistantOptions);
   const server=http.createServer(async(req,res)=>{
     const send=(status,value)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});res.end(JSON.stringify(value));};
     try{
@@ -18,6 +20,15 @@ export function createApp(store) {
       if(req.headers.origin&&req.headers.origin!==`http://${req.headers.host}`)throw new HttpError(403,'不允许跨站请求');
       res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('X-Frame-Options','DENY');res.setHeader('Referrer-Policy','no-referrer');
       const url=new URL(req.url,'http://localhost');
+      if(req.method==='GET'&&url.pathname==='/api/assistant/status')return send(200,assistant.status());
+      if(req.method==='POST'&&['/api/assistant/turn','/api/assistant/commit','/api/assistant/cancel'].includes(url.pathname)){
+        if(req.headers['x-dashboard-token']!==csrf)throw new HttpError(403,'请刷新页面后再操作');
+        if(!req.headers['content-type']?.startsWith('application/json'))throw new HttpError(415,'需要 JSON');
+        let size=0;const chunks=[];for await(const chunk of req){size+=chunk.length;if(size>200000)throw new HttpError(413,'要求过长，请分批处理');chunks.push(chunk);}
+        let packet;try{packet=JSON.parse(Buffer.concat(chunks).toString('utf8'))}catch{throw new HttpError(400,'请求格式错误');}
+        if(!packet||typeof packet!=='object'||Array.isArray(packet))throw new HttpError(400,'请求格式错误');
+        const action=url.pathname.split('/').at(-1);return send(200,await assistant[action](packet));
+      }
       if(req.method==='GET'&&url.pathname==='/api/state')return send(200,{...await store.read(),csrf});
       if(req.method==='PUT'&&url.pathname==='/api/state'){
         if(req.headers['x-dashboard-token']!==csrf)throw new HttpError(403,'请刷新页面后再保存');

@@ -34,13 +34,13 @@ function runDatabaseCommand(action){
         storageState.revision=reply.revision;storageState.lastBackup=reply.savedAt;
         storageState.base=json;dashboardMemory.setItem(KEY,json);storageState.local='● 已保存到 MySQL';
       }
-      storageState.writing=false;busyUI(false);databaseRender();paintStorage();
+      storageState.writing=false;busyUI(false);render();paintStorage();
       if(storageState.messages.length)databaseToast(storageState.messages.at(-1));
       return {ok:true,value:result};
     }catch(e){
       data=before;dashboardMemory.values=memoryBefore;storageState.base=JSON.stringify(before);
       storageState.command=false;storageState.writing=false;storageState.blocked=true;
-      storageState.local='保存未确认：请刷新重新连接';busyUI(false);databaseRender();paintStorage();
+      storageState.local='保存未确认：请刷新重新连接';busyUI(false);render();paintStorage();
       databaseToast('未确认保存：'+e.message+'。请刷新读取数据库最新状态后再操作。');return {ok:false};
     }finally{storageState.command=false;}
   })();
