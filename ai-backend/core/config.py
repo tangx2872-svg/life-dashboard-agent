@@ -55,7 +55,7 @@ def _env_path(key: str, default: Path) -> Path:
 
 
 # 可选的 Provider 名称（用于校验与 /health 展示，不含任何密钥）
-ASR_PROVIDERS = ("funasr", "openai", "mock")
+ASR_PROVIDERS = ("funasr", "openai", "gemini", "mock")
 LLM_PROVIDERS = ("openai", "autodl", "local_qwen", "mock")
 
 
@@ -95,6 +95,10 @@ class Settings:
     autodl_llm_max_retries: int = 2
     # auto=先尝试 json_schema，不支持自动降级；on=强制；off=禁用
     autodl_llm_structured: str = "auto"
+
+    gemini_api_key: str = ""
+    gemini_base_url: str = ""
+    gemini_model: str = ""
 
     # ---- FunASR ----
     funasr_model: str = "paraformer-zh"
@@ -153,6 +157,9 @@ class Settings:
             autodl_llm_timeout_s=_env_float("AUTODL_LLM_TIMEOUT_S", 120.0),
             autodl_llm_max_retries=_env_int("AUTODL_LLM_MAX_RETRIES", 2),
             autodl_llm_structured=_env_str("AUTODL_LLM_STRUCTURED", "auto").lower(),
+            gemini_api_key=_env_str("GEMINI_API_KEY", ""),
+            gemini_base_url=_env_str("GEMINI_BASE_URL", ""),
+            gemini_model=_env_str("GEMINI_MODEL", ""),
             funasr_model=_env_str("FUNASR_MODEL", "paraformer-zh"),
             funasr_model_revision=_env_str("FUNASR_MODEL_REVISION", ""),
             funasr_device=_env_str("FUNASR_DEVICE", "cuda:0"),

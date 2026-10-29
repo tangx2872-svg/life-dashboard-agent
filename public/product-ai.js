@@ -1,7 +1,7 @@
-const captureUI={text:'',busy:false,error:'',preview:null,projectId:'',recording:false};
-function productAIPage(){const p=captureUI.preview;return heading('AI Capture','说清想法，检查计划，再决定保存什么。')+`<section class="product-panel"><div class="product-kicker">01 输入 → 02 编辑预览 → 03 确认保存</div><label>想记录什么？<textarea id="product-capture-text" rows="4" maxlength="4000" placeholder="例如：明天下午三点开会，晚上八点修改论文" oninput="captureUI.text=this.value" ${captureUI.busy||captureUI.recording?'disabled':''}>${esc(captureUI.text)}</textarea></label><label>保存到事项（可选）<select onchange="captureUI.projectId=this.value" ${captureUI.busy?'disabled':''}><option value="">日常任务</option>${data.projects.map(p=>`<option value="${p.id}" ${captureUI.projectId===p.id?'selected':''}>${esc(p.title)}</option>`).join('')}</select></label><div class="row-actions"><button class="primary" onclick="productParse()" ${captureUI.busy||captureUI.recording?'disabled':''}>${captureUI.busy?'正在整理…':'整理为行动'}</button><button class="product-voice ${captureUI.recording?'is-recording':''}" onclick="productVoice()" ${captureUI.busy?'disabled':''} aria-pressed="${captureUI.recording}">${captureUI.recording?'■ 结束录音':'● 开始语音输入'}</button><span role="status">${captureUI.recording?'正在聆听，讲完后点击结束录音':'支持直接打字，也可以录音后编辑文字'}</span><button onclick="nav('gptImport')">高级 JSON 导入</button></div><p class="product-hint">内容会发送给已配置的 AI 服务。只有你确认后才写入 MySQL；不会自动修改现有事项。</p>${captureUI.error?`<p class="product-error" role="alert">${esc(captureUI.error)}。可以保留文字后重试。</p>`:''}</section>${p?`<section class="product-panel"><h2>检查这 ${p.items.length} 项内容</h2><p class="product-hint">标题、类型、日期、补充内容均可修改。不需要的项取消勾选。</p><div class="product-preview">${p.items.map((x,i)=>`<article><label><input type="checkbox" style="display:inline;width:auto" ${x.selected?'checked':''} onchange="captureUI.preview.items[${i}].selected=this.checked"> 保存这项</label><label>标题<input aria-label="预览标题 ${i+1}" maxlength="500" value="${esc(x.title)}" oninput="captureUI.preview.items[${i}].title=this.value"></label><label>类型<select onchange="captureUI.preview.items[${i}].kind=this.value">${[['','请选择类型'],['task','任务'],['event','日程'],['inbox','待整理想法']].map(([v,n])=>`<option value="${v}" ${x.kind===v?'selected':''}>${n}</option>`).join('')}</select></label><label>日期<input type="date" value="${esc(x.date)}" onchange="captureUI.preview.items[${i}].date=this.value"></label><label>时间（可选）<input type="time" value="${esc(x.time||'')}" onchange="captureUI.preview.items[${i}].time=this.value"></label><label>补充<textarea rows="3" oninput="captureUI.preview.items[${i}].note=this.value">${esc(x.note)}</textarea></label><label><input type="checkbox" style="display:inline;width:auto" ${x.today?'checked':''} onchange="captureUI.preview.items[${i}].today=this.checked"> 同时加入今日专注（仅任务）</label>${x.start?`<small>识别时间：${esc(x.start)}${x.end?' — '+esc(x.end):''}</small>`:''}</article>`).join('')}</div><div class="product-toolbar"><button class="primary" onclick="productCommitCapture()">确认保存所选内容</button><button onclick="captureUI.preview=null;render()">放弃预览</button></div></section>`:''}`}
+const captureUI={text:'',busy:false,error:'',preview:null,projectId:'',recording:false,transcribing:false};
+function productAIPage(){const p=captureUI.preview;return heading('AI Capture','说清想法，检查计划，再决定保存什么。')+`<section class="product-panel"><div class="product-kicker">01 输入 → 02 编辑预览 → 03 确认保存</div><label>想记录什么？<textarea id="product-capture-text" rows="4" maxlength="4000" placeholder="例如：明天下午三点开会，晚上八点修改论文" oninput="captureUI.text=this.value" ${captureUI.busy||captureUI.recording||captureUI.transcribing?'disabled':''}>${esc(captureUI.text)}</textarea></label><label>保存到事项（可选）<select onchange="captureUI.projectId=this.value" ${captureUI.busy?'disabled':''}><option value="">日常任务</option>${data.projects.map(p=>`<option value="${p.id}" ${captureUI.projectId===p.id?'selected':''}>${esc(p.title)}</option>`).join('')}</select></label><div class="row-actions"><button class="primary" onclick="productParse()" ${captureUI.busy||captureUI.recording||captureUI.transcribing?'disabled':''}>${captureUI.busy?'正在整理…':'整理为行动'}</button><button class="product-voice ${captureUI.recording?'is-recording':''}" onclick="productVoice()" ${captureUI.busy||captureUI.transcribing?'disabled':''} aria-pressed="${captureUI.recording}">${captureUI.transcribing?'正在识别录音…':captureUI.recording?'■ 结束录音':'● 开始语音输入'}</button><span role="status">${captureUI.recording?'正在聆听，讲完后点击结束录音':'录音结束后由 AI 转写，也支持直接打字'}</span><button onclick="nav('gptImport')">高级 JSON 导入</button>${productAudio.blob&&!captureUI.transcribing?'<button onclick="productTranscribe()">重试语音识别</button>':''}</div><p class="product-hint">内容会发送给已配置的 AI 服务。只有你确认后才写入 MySQL；不会自动修改现有事项。</p>${captureUI.error?`<p class="product-error" role="alert">${esc(captureUI.error)}。可以保留文字后重试。</p>`:''}</section>${p?`<section class="product-panel"><h2>检查这 ${p.items.length} 项内容</h2><p class="product-hint">标题、类型、日期、补充内容均可修改。不需要的项取消勾选。</p><div class="product-preview">${p.items.map((x,i)=>`<article><label><input type="checkbox" style="display:inline;width:auto" ${x.selected?'checked':''} onchange="captureUI.preview.items[${i}].selected=this.checked"> 保存这项</label><label>标题<input aria-label="预览标题 ${i+1}" maxlength="500" value="${esc(x.title)}" oninput="captureUI.preview.items[${i}].title=this.value"></label><label>类型<select onchange="captureUI.preview.items[${i}].kind=this.value">${[['','请选择类型'],['task','任务'],['event','日程'],['inbox','待整理想法']].map(([v,n])=>`<option value="${v}" ${x.kind===v?'selected':''}>${n}</option>`).join('')}</select></label><label>日期<input type="date" value="${esc(x.date)}" onchange="captureUI.preview.items[${i}].date=this.value"></label><label>时间（可选）<input type="time" value="${esc(x.time||'')}" onchange="captureUI.preview.items[${i}].time=this.value"></label><label>补充<textarea rows="3" oninput="captureUI.preview.items[${i}].note=this.value">${esc(x.note)}</textarea></label><label><input type="checkbox" style="display:inline;width:auto" ${x.today?'checked':''} onchange="captureUI.preview.items[${i}].today=this.checked"> 同时加入今日专注（仅任务）</label>${x.start?`<small>识别时间：${esc(x.start)}${x.end?' — '+esc(x.end):''}</small>`:''}</article>`).join('')}</div><div class="product-toolbar"><button class="primary" onclick="productCommitCapture()">确认保存所选内容</button><button onclick="captureUI.preview=null;render()">放弃预览</button></div></section>`:''}`}
 async function productParse(){
-  if(captureUI.busy||captureUI.recording)return;if(!captureUI.text.trim())return toast('先写下你的想法。');
+  if(captureUI.busy||captureUI.recording||captureUI.transcribing)return;if(!captureUI.text.trim())return toast('先写下你的想法。');
   captureUI.busy=true;captureUI.error='';captureUI.preview=null;render();
   try{
     const result=await productAPI.capture(captureUI.text.trim()),c=result.capture;
@@ -35,25 +35,40 @@ async function productCommitCapture(){
   });
   if(result?.ok){captureUI.preview=null;captureUI.text='';nav('tasks')}
 }
-let productRecognition=null;
-function productVoice(){
- if(captureUI.busy)return;
- if(productRecognition){productRecognition.stop();return}
- const Recognition=window.SpeechRecognition||window.webkitSpeechRecognition;
- if(!Recognition)return toast('当前浏览器不支持语音输入，请使用系统听写或直接输入文字。');
- const recognition=new Recognition(),base=captureUI.text;
- productRecognition=recognition;captureUI.recording=true;
- recognition.lang='zh-CN';recognition.continuous=true;recognition.interimResults=true;
- const update=()=>{if(page==='aiCapture')render()};
- recognition.onresult=e=>{
-  if(productRecognition!==recognition)return;
-  // Results are the current session's cumulative list. Rebuild rather than append each interim revision.
-  const parts=Array.from(e.results,r=>r[0]?.transcript||'');
-  captureUI.text=(base+(base&&parts.length?'\n':'')+parts.join('')).slice(0,4000);
-  const input=document.getElementById('product-capture-text');if(input)input.value=captureUI.text;
- };
- recognition.onerror=e=>toast(e.error==='not-allowed'?'麦克风权限未开启，请允许访问或直接输入文字。':'语音输入已中断，可以检查文字后继续。');
- recognition.onend=()=>{if(productRecognition!==recognition)return;productRecognition=null;captureUI.recording=false;update()};
- try{recognition.start();update()}catch{productRecognition=null;captureUI.recording=false;update();toast('无法启动录音，请检查麦克风权限。')}
+const productAudio={recorder:null,stream:null,chunks:[],blob:null,base:'',timer:null,starting:false,cancelled:false};
+function productVoiceRender(){if(page==='aiCapture')render()}
+async function productVoice(){
+ if(captureUI.busy||captureUI.transcribing)return;
+ if(productAudio.starting){productAudio.cancelled=true;return}
+ if(productAudio.recorder?.state==='recording'){productAudio.recorder.stop();return}
+ if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder)return toast('当前浏览器不支持录音，请使用新版 Chrome、Edge 或 Safari，或直接输入文字。');
+ productAudio.starting=true;productAudio.cancelled=false;captureUI.recording=true;captureUI.error='';productVoiceRender();
+ try{
+  const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+  if(productAudio.cancelled){stream.getTracks().forEach(t=>t.stop());captureUI.recording=false;return}
+  productAudio.stream=stream;
+  const type=['audio/webm;codecs=opus','audio/webm','audio/mp4'].find(t=>MediaRecorder.isTypeSupported(t));
+  if(!type)throw Error('当前浏览器没有支持的录音格式，请换用 Chrome 或 Edge。');
+  const recorder=new MediaRecorder(stream,{mimeType:type});productAudio.recorder=recorder;productAudio.chunks=[];productAudio.blob=null;productAudio.base=captureUI.text;
+  let bytes=0,failed=false;
+  recorder.ondataavailable=e=>{if(e.data.size){bytes+=e.data.size;if(bytes>20*1024*1024){failed=true;captureUI.error='录音超过20MB，请分段录音';if(recorder.state==='recording')recorder.stop()}else productAudio.chunks.push(e.data)}};
+  recorder.onerror=()=>{failed=true;captureUI.error='录音失败，请检查麦克风后重试';if(recorder.state==='recording')recorder.stop()};
+  recorder.onstop=async()=>{
+   clearTimeout(productAudio.timer);stream.getTracks().forEach(t=>t.stop());productAudio.recorder=null;productAudio.stream=null;captureUI.recording=false;
+   if(failed){productVoiceRender();return}
+   productAudio.blob=new Blob(productAudio.chunks,{type});productAudio.chunks=[];
+   if(!productAudio.blob.size){captureUI.error='录音为空，请重新录音';productVoiceRender();return}
+   await productTranscribe();
+  };
+  recorder.start(1000);productAudio.timer=setTimeout(()=>{if(recorder.state==='recording')recorder.stop()},120000);
+ }catch(e){captureUI.recording=false;productAudio.stream?.getTracks().forEach(t=>t.stop());productAudio.stream=null;captureUI.error=e.name==='NotAllowedError'?'麦克风权限未开启，请允许访问后重试':e.message||'无法启动录音';}
+ finally{productAudio.starting=false;productVoiceRender()}
+}
+async function productTranscribe(){
+ if(!productAudio.blob||captureUI.transcribing||captureUI.recording)return;
+ productAudio.base=captureUI.text;captureUI.transcribing=true;captureUI.error='';productVoiceRender();
+ try{const result=await productAPI.transcribe(productAudio.blob);const combined=productAudio.base+(productAudio.base?'\n':'')+result.transcript;if(combined.length>4000)throw Error('文字超过4000字，请缩短原文后重试');captureUI.text=combined;productAudio.blob=null;toast('录音已转成文字，请检查后再整理为行动。')}
+ catch(e){captureUI.error=e.message||'语音识别失败，可以重试或直接输入文字'}
+ finally{captureUI.transcribing=false;productVoiceRender()}
 }
 function productAsk(pid=''){captureUI.projectId=pid;nav('aiCapture')}

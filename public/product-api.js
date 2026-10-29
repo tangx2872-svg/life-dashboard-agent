@@ -5,5 +5,6 @@ const productAPI={
     let value;try{value=await response.json()}catch{throw Error('服务返回了无法读取的内容，请稍后重试。')}
     if(!response.ok){const error=new Error(typeof value.error==='string'?value.error:value.error?.message||'服务暂时不可用');error.code=value.error?.code;throw error}return value;
   },
+  transcribe(audio){return this.request('/api/ai/audio/transcribe',{method:'POST',headers:{'Content-Type':audio.type.split(';')[0]},body:audio})},
   capture(text){return this.request('/api/ai/capture/text',{method:'POST',body:JSON.stringify({text,timezone:Intl.DateTimeFormat().resolvedOptions().timeZone||'Asia/Shanghai',locale:'zh-CN',current_datetime:new Date().toISOString()})})}
 };

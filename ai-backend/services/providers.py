@@ -30,6 +30,10 @@ def build_asr_provider(settings: Settings) -> ASRProvider:
 
         return MockASRProvider(text=settings.mock_asr_text)
 
+    if name == "gemini":
+        from services.asr.gemini_asr import GeminiASRProvider
+        return GeminiASRProvider(settings)
+
     if name == "funasr":
         from services.asr.funasr import FunASRProvider
 

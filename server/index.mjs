@@ -23,6 +23,15 @@ export function createApp(store,options={}) {
       res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('X-Frame-Options','DENY');res.setHeader('Referrer-Policy','no-referrer');
       const url=new URL(req.url,'http://localhost');
       if(req.method==='GET'&&url.pathname==='/api/ai/health')return send(200,await ai.check_health());
+      if(req.method==='POST'&&url.pathname==='/api/ai/audio/transcribe'){
+        if(req.headers['x-dashboard-token']!==csrf)throw new HttpError(403,'请刷新页面后再操作');
+        const type=(req.headers['content-type']||'').split(';')[0].trim().toLowerCase();
+        const extensions={'audio/webm':'webm','audio/mp4':'m4a','audio/wav':'wav','audio/mpeg':'mp3'};
+        if(!extensions[type])throw new HttpError(415,'不支持的录音格式');
+        const chunks=[];let size=0;for await(const chunk of req){size+=chunk.length;if(size>20*1024*1024)throw new HttpError(413,'录音超过20MB，请分段录音');chunks.push(chunk)}
+        if(!size)throw new HttpError(400,'录音为空');
+        return send(200,await ai.transcribe_audio(Buffer.concat(chunks),type,'recording.'+extensions[type]));
+      }
       if(req.method==='POST'&&url.pathname==='/api/ai/capture/text'){
         if(req.headers['x-dashboard-token']!==csrf)throw new HttpError(403,'请刷新页面后再操作');
         if(!req.headers['content-type']?.startsWith('application/json'))throw new HttpError(415,'需要 JSON');

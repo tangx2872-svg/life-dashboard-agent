@@ -16,7 +16,7 @@ test('Integrated Python → Node → browser preview → confirmed MySQL → off
  assert.ok(existsSync(python),'Install the isolated AI Python environment first');
  assert.ok(process.env.BROWSER_MODULE,'Set BROWSER_MODULE to Playwright for the full integration test');
  const probe=net.createServer();await new Promise(r=>probe.listen(0,'127.0.0.1',r));const port=probe.address().port;await new Promise(r=>probe.close(r));
- const pythonProcess=spawn(python,['-m','uvicorn','app:app','--host','127.0.0.1','--port',String(port)],{cwd:fileURLToPath(new URL('../ai-backend/',import.meta.url)),windowsHide:true,stdio:['ignore','pipe','pipe'],env:{...process.env,PYTHONUTF8:'1',ASR_PROVIDER:'mock',LLM_PROVIDER:'mock',AUTODL_LLM_API_KEY:'',OPENAI_API_KEY:'',UPLOAD_DIR:fileURLToPath(new URL('../.local/integration-uploads/',import.meta.url)),LOG_LEVEL:'WARNING'}});
+ const pythonProcess=spawn(python,['-m','uvicorn','app:app','--host','127.0.0.1','--port',String(port)],{cwd:fileURLToPath(new URL('../ai-backend/',import.meta.url)),windowsHide:true,stdio:['ignore','pipe','pipe'],env:{...process.env,PYTHONUTF8:'1',ASR_PROVIDER:'mock',LLM_PROVIDER:'mock',AUTODL_LLM_API_KEY:'',OPENAI_API_KEY:'',UPLOAD_DIR:fileURLToPath(new URL('../.local/integration-uploads/',import.meta.url)),LOG_LEVEL:'WARNING',APP_ENV:'test'}});
  let logs='',processError;pythonProcess.on('error',e=>processError=e);pythonProcess.stderr.on('data',d=>logs=(logs+d).slice(-5000));pythonProcess.stdout.on('data',()=>{});
  let f,browser;const baseUrl=`http://127.0.0.1:${port}`;
  try{
@@ -25,6 +25,10 @@ test('Integrated Python → Node → browser preview → confirmed MySQL → off
   const ai=createAIBackendClient({baseUrl,timeoutS:5});assert.deepEqual(await ai.check_health(),{status:'ok'});
   const parsed=await ai.parse_text_capture('整合测试：检查论文引用');assert.equal(parsed.capture.items[0].title,'整合测试：检查论文引用');assert.equal(typeof parsed.timings.validation_ms,'number');
   f=await fixture({aiClient:ai});assert.equal((await fetch(f.url+'/api/ai/health')).status,200);
+  const boot=await(await fetch(f.url+'/api/state')).json();
+  const voice=await fetch(f.url+'/api/ai/audio/transcribe',{method:'POST',headers:{'Content-Type':'audio/wav','X-Dashboard-Token':boot.csrf},body:Buffer.from('RIFF____WAVEfmt test audio')});assert.equal(voice.status,200);assert.ok((await voice.json()).transcript);assert.equal((await f.store.read()).revision,0);
+  assert.equal((await fetch(f.url+'/api/ai/audio/transcribe',{method:'POST'})).status,403);
+  assert.equal((await fetch(f.url+'/api/ai/audio/transcribe',{method:'POST',headers:{'Content-Type':'text/plain','X-Dashboard-Token':boot.csrf},body:'not audio'})).status,415);
   const {chromium}=await import(pathToFileURL(process.env.BROWSER_MODULE));browser=await chromium.launch({executablePath:process.env.CHROME_PATH||'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true});
   const page=await browser.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(f.url+'/#/aiCapture');await page.waitForFunction(()=>window.dashboardReady);
   const before=await f.store.read();await page.locator('#product-capture-text').fill('整合测试：检查论文引用');await page.getByRole('button',{name:'整理为行动',exact:true}).click();await page.waitForFunction(()=>captureUI.preview&&!captureUI.busy);assert.equal((await f.store.read()).revision,before.revision);

@@ -246,3 +246,32 @@ async def local_llm_test(
         output=output,
         timings=GenerationTimings(generation_ms=generation_ms),
     )
+
+
+@router.post("/api/audio/transcribe", tags=["audio"])
+async def transcribe_audio(request: Request, file: UploadFile = File(...)):
+    """Transcribe only: no planning, capture generation or database writes."""
+    import time
+    from core.errors import AppError, ErrorCode
+    settings = _settings(request)
+    if settings.asr_provider == "mock" and settings.app_env != "test":
+        raise AppError(code=ErrorCode.PROVIDER_NOT_CONFIGURED,
+                       message="请配置真实语音转写服务，当前为 Mock", status_code=503)
+    service = _service(request)
+    started = time.perf_counter()
+    saved = await service.save_audio(file)
+    try:
+        try:
+            transcript = (await service.asr.transcribe(str(saved.path))).strip()
+        except AppError:
+            raise
+        except Exception:
+            raise AppError(code=ErrorCode.ASR_FAILED, message="语音识别失败，请重试", status_code=502) from None
+        if not transcript:
+            raise AppError(code=ErrorCode.ASR_FAILED, message="未识别到语音，请重新录音", status_code=502)
+        if len(transcript) > settings.max_text_chars:
+            raise AppError(code=ErrorCode.INVALID_REQUEST, message="录音文字超过上限，请分段录音", status_code=413)
+        return {"status": "ok", "transcript": transcript,
+                "timings": {"asr_ms": int((time.perf_counter()-started)*1000)}}
+    finally:
+        saved.path.unlink(missing_ok=True)
