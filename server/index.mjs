@@ -1,4 +1,5 @@
 import http from 'node:http';
+import {createAIBackendClient,aiBackendConfig,validateCaptureInput,AIBackendError} from './ai-backend-client.mjs';
 import { randomBytes } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -9,6 +10,7 @@ import { createAssistant } from './assistant.mjs';
 const publicDir=fileURLToPath(new URL('../public/',import.meta.url));
 const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml'};
 export function createApp(store,options={}) {
+  const ai=options.aiClient||createAIBackendClient(aiBackendConfig());
   const csrf=randomBytes(32).toString('hex');
   const assistant=createAssistant(store,options.assistantOptions);
   const server=http.createServer(async(req,res)=>{
@@ -20,6 +22,14 @@ export function createApp(store,options={}) {
       if(req.headers.origin&&req.headers.origin!==`http://${req.headers.host}`)throw new HttpError(403,'不允许跨站请求');
       res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('X-Frame-Options','DENY');res.setHeader('Referrer-Policy','no-referrer');
       const url=new URL(req.url,'http://localhost');
+      if(req.method==='GET'&&url.pathname==='/api/ai/health')return send(200,await ai.check_health());
+      if(req.method==='POST'&&url.pathname==='/api/ai/capture/text'){
+        if(req.headers['x-dashboard-token']!==csrf)throw new HttpError(403,'请刷新页面后再操作');
+        if(!req.headers['content-type']?.startsWith('application/json'))throw new HttpError(415,'需要 JSON');
+        let size=0;const chunks=[];for await(const chunk of req){size+=chunk.length;if(size>32000)throw new HttpError(413,'文本过长');chunks.push(chunk)}
+        let body;try{body=JSON.parse(Buffer.concat(chunks).toString('utf8'))}catch{throw new HttpError(400,'请求格式错误')}
+        const input=validateCaptureInput(body);return send(200,await ai.parse_text_capture(input.text,input.timezone,input.locale,input.current_datetime));
+      }
       if(req.method==='GET'&&url.pathname==='/api/assistant/status')return send(200,assistant.status());
       if(req.method==='POST'&&['/api/assistant/turn','/api/assistant/commit','/api/assistant/cancel'].includes(url.pathname)){
         if(req.headers['x-dashboard-token']!==csrf)throw new HttpError(403,'请刷新页面后再操作');
@@ -50,7 +60,7 @@ export function createApp(store,options={}) {
       if(!/^[\w.-]+$/.test(relative)||relative.startsWith('.'))throw new HttpError(404,'文件不存在');
       let content;try{content=await readFile(path.join(publicDir,relative))}catch{throw new HttpError(404,'文件不存在')}
       res.writeHead(200,{'Content-Type':mime[path.extname(relative)]||'application/octet-stream','Cache-Control':'no-store'});res.end(content);
-    }catch(e){const status=e.status||503;send(status,{error:e.status?e.message:'数据库暂时无法访问。请保留页面，检查后端与 MySQL 后刷新重试。'});}
+    }catch(e){if(e instanceof AIBackendError)return send(e.status,{status:'error',error:{code:e.code,message:e.message}});const status=e.status||503;send(status,{error:e.status?e.message:'数据库暂时无法访问。请保留页面，检查后端与 MySQL 后刷新重试。'});}
   });return server;
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(path.resolve(process.argv[1])).href){
