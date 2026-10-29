@@ -1,3 +1,5 @@
+> 后续开发请先读 [开发交接清单](docs/DEVELOPER-HANDOFF.md)。本机授权交接的真实配置另存于被 Git 忽略的 `.local/HANDOFF-PRIVATE.md`。
+
 > 录音更新：AI Capture 改用后端 Gemini 语音转写，支持开始/结束录音与失败重试，文字确认后再交给 GPT 整理。详见 [语音转写说明](docs/VOICE-TRANSCRIPTION.md)。
 
 > AI 后端源码已合并到 `ai-backend/`，保留 Python 服务和 Node/MySQL 主站边界。支持现有 AutoDL 连接、本地双服务启动与独立整合测试，详见 [AI 整合与验收说明](docs/AI-INTEGRATION.md)。
