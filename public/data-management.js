@@ -31,6 +31,7 @@ function prepareDeletion(d,kind,id,parentId){const next=JSON.parse(JSON.stringif
   // Historical records are independent snapshots: keep text/date, detach deleted live IDs.
   next.history.forEach(h=>{for(const key of ['projectId','roadmapId','taskId','learningTaskId','phaseId','stageId'])if(removed.has(h[key])||stages.has(h[key])){h[key]='';h.sourceDeleted=true}});
   for(const key of ['homeFocus','homeOrder'])if(Array.isArray(next[key]))next[key]=next[key].filter(k=>!removed.has(k.slice(2)));
+  if(next.todayFocus)next.todayFocus.taskIds=next.todayFocus.taskIds.filter(id=>!removed.has(id));
   assertDashboardData(next);return {value:next,title,stageCount,taskCount};
 }
 function deleteManaged(kind,id,parent=''){try{const plan=prepareDeletion(data,kind,id,parent);if(!confirm(`删除“${plan.title}”？包含 ${plan.stageCount} 个阶段、${plan.taskCount} 个任务及其子任务/笔记。关联的计划节点会一并移除；已完成历史保留为独立记录。删除前会保存当前快照。`))return false;safetyCheckpoint('删除前自动备份');persistData(plan.value);data=plan.value;duplicateReport=null;if(['project','roadmap'].includes(kind)||page==='learningTask')page='dataManagement';render();toast('已删除关联内容，操作前快照可下载。');return true}catch(e){toast('未删除：'+e.message);return false}}

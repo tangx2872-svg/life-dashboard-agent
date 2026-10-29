@@ -19,7 +19,7 @@ function runDatabaseCommand(action){
   return (async()=>{
     const before=JSON.parse(storageState.base),memoryBefore=new Map(dashboardMemory.values);
     storageState.messages=[];storageState.command=true;storageState.staged=false;storageState.reason='保存更改';storageState.failure=null;
-    let result;
+    let result,writeAttempted=false;
     try{
       result=action();
       if(result&&typeof result.then==='function')throw Error('保存回调必须同步计算修改内容');
@@ -29,6 +29,7 @@ function runDatabaseCommand(action){
       storageState.command=false;
       if(storageState.staged&&json!==JSON.stringify(before)){
         storageState.writing=true;storageState.local='正在保存到 MySQL';busyUI(true);paintStorage();
+        writeAttempted=true;
         const response=await fetch('/api/state',{method:'PUT',headers:{'Content-Type':'application/json','X-Dashboard-Token':dashboardBoot.csrf},body:JSON.stringify({data,revision:storageState.revision,requestId:crypto.randomUUID(),reason:storageState.reason}),signal:AbortSignal.timeout(20000)});
         const reply=await response.json();if(!response.ok)throw Error(reply.error||'数据库保存失败');
         storageState.revision=reply.revision;storageState.lastBackup=reply.savedAt;
@@ -39,9 +40,9 @@ function runDatabaseCommand(action){
       return {ok:true,value:result};
     }catch(e){
       data=before;dashboardMemory.values=memoryBefore;storageState.base=JSON.stringify(before);
-      storageState.command=false;storageState.writing=false;storageState.blocked=true;
-      storageState.local='保存未确认：请刷新重新连接';busyUI(false);render();paintStorage();
-      databaseToast('未确认保存：'+e.message+'。请刷新读取数据库最新状态后再操作。');return {ok:false};
+      storageState.command=false;storageState.writing=false;storageState.blocked=writeAttempted;
+      storageState.local=writeAttempted?'保存未确认：请刷新重新连接':'● 数据未修改';busyUI(false);render();paintStorage();
+      databaseToast(writeAttempted?'未确认保存：'+e.message+'。请刷新读取数据库最新状态后再操作。':'未保存：'+e.message);return {ok:false};
     }finally{storageState.command=false;}
   })();
 }
