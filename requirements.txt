@@ -1,0 +1,41 @@
+# ============================================================
+# Life Dashboard AI Backend 依赖
+# Python 3.10（已验证：3.10.22）
+# 安装：pip install -r requirements.txt
+#
+# 说明：当前正式链路完全不依赖 GPU / PyTorch。
+# torch / transformers / funasr 只在可选 Provider 里惰性导入，
+# 需要时单独安装，不要混进核心依赖。
+# ============================================================
+
+# ---- Web 服务 ----
+fastapi>=0.110,<1.0            # 已验证 0.162.0
+uvicorn[standard]>=0.27,<1.0   # 已验证 0.54.0
+
+# ---- 表单 / 文件上传 ----
+python-multipart>=0.0.9        # 已验证 0.0.32
+
+# ---- 结构化数据校验 ----
+pydantic>=2.6,<3.0             # 已验证 2.14.1
+
+# ---- 环境变量（读取 .env）----
+python-dotenv>=1.0,<2.0        # 已验证 1.2.4
+
+# ---- AutoDL OpenAI-compatible API（Responses API；正式链路唯一依赖的推理 SDK）----
+openai>=1.60                   # 已验证 3.41.0
+
+# ---- 测试（TestClient 依赖 httpx；异步用例直接用 asyncio.run，无需 pytest-asyncio）----
+pytest>=8.0                    # 已验证 9.2.0
+httpx>=0.27                    # 已验证 0.28.1
+
+# ============================================================
+# 可选依赖（默认不安装，按需单独装）
+#
+# 本地 FunASR 中文 ASR（ASR_PROVIDER=funasr）：
+#   pip install funasr            # 会附带 torch，体积较大
+#
+# 本地 Qwen 生成（LLM_PROVIDER=local_qwen）：
+#   pip install transformers accelerate safetensors   # 需要 torch + GPU
+#
+# 手工脚本 tools/test_text_capture_real.py 只用到 httpx（已包含）。
+# ============================================================

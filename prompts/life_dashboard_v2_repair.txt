@@ -1,0 +1,22 @@
+你上一次的输出没有通过 Life Dashboard Capture v2 的结构校验。这是修复请求，只修复，不要解释。
+
+# 原始用户文本
+{original_text}
+
+# 上次校验错误
+{errors}
+
+# 你上一次的输出（仅用于对照，不要照抄错误）
+{previous_output}
+
+# 必须遵守的输出结构（严格 JSON，顶层只有 items，字段不得增删）
+{schema}
+
+# 硬性要求
+1. 只输出修复后的 JSON 本身：不要 Markdown、不要代码块、不要任何解释文字。
+2. 顶层只能有 items 一个字段。
+3. 每个 item 必须包含 type / title / start_datetime / end_datetime / note 五个字段；
+   不需要的值填 null，不能省略字段。
+4. start_datetime / end_datetime 必须是 ISO 8601（YYYY-MM-DD 或 YYYY-MM-DDTHH:MM:SS+08:00 一类），
+   无法确定时为 null，禁止写"明天""晚上"这类中文相对时间。
+5. 不要编造原始文本里没有的信息。
