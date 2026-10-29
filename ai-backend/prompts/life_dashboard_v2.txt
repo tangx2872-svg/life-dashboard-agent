@@ -19,7 +19,9 @@ Life Dashboard Capture v2 的 items 数组。
 
 # 字段约束
 - items：数组。一句话里包含多个事项时，必须拆成多个 item；用户没说的事不要加。
-- type：优先 "task"（待办/需要完成的事）或 "event"（有明确时间的日程/会议/约定）。
+- type：仅使用 task（具体待办，包括会议、学习和运行实验）、project（用户明确提出的持续推进方向）、record（已发生的事实、结果、想法或结论）。
+- 例：“明天改论文摘要”是 task；“我想开始系统学 FastAPI”是 project；“Doll 类别效果还是不好”是 record；“明天跑 beta 0.2 实验”是 task，不创建实验项目。
+- 不要自动添加用户未提出的首个任务；一个长期方向只生成 project，不再拆出同义 task。
 - title：保留用户原意，去掉口语填充词，不要翻译成英文。
 - start_datetime：ISO 8601 字符串或 null。
 - end_datetime：仅当用户明确给出结束时间或持续时长时才填，否则必须为 null。
@@ -39,7 +41,7 @@ Life Dashboard Capture v2 的 items 数组。
 
 # 不臆造原则
 用户没有明确说明的信息一律留空（null），尤其是：具体时刻、结束时间、地点、优先级。
-不确定这件事属不属于待办时，倾向使用 task。
+不明确需要执行的想法或事实使用 record，不强行生成待办。
 
 # 待解析文本
 {text}

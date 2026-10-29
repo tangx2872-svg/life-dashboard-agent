@@ -18,7 +18,7 @@ function runDatabaseCommand(action){
   if(storageState.writing||storageState.blocked){databaseToast('请等待保存完成；如连接失败，请先刷新重新连接。');return Promise.resolve(false);}
   return (async()=>{
     const before=JSON.parse(storageState.base),memoryBefore=new Map(dashboardMemory.values);
-    storageState.messages=[];storageState.command=true;storageState.staged=false;storageState.reason='保存更改';storageState.failure=null;
+    storageState.pendingReceipt=null;storageState.pendingUndo=null;storageState.messages=[];storageState.command=true;storageState.staged=false;storageState.reason='保存更改';storageState.failure=null;
     let result,writeAttempted=false;
     try{
       result=action();
@@ -35,11 +35,11 @@ function runDatabaseCommand(action){
         storageState.revision=reply.revision;storageState.lastBackup=reply.savedAt;
         storageState.base=json;dashboardMemory.setItem(KEY,json);storageState.local='● 已保存到 MySQL';
       }
-      storageState.writing=false;busyUI(false);render();paintStorage();
+      storageState.writing=false;busyUI(false);if(storageState.pendingUndo){simpleUndo=storageState.pendingUndo;storageState.pendingUndo=null;}if(storageState.pendingReceipt){simpleReceipt=storageState.pendingReceipt;storageState.pendingReceipt=null;}render();paintStorage();
       if(storageState.messages.length)databaseToast(storageState.messages.at(-1));
       return {ok:true,value:result};
     }catch(e){
-      data=before;dashboardMemory.values=memoryBefore;storageState.base=JSON.stringify(before);
+      storageState.pendingReceipt=null;storageState.pendingUndo=null;data=before;dashboardMemory.values=memoryBefore;storageState.base=JSON.stringify(before);
       storageState.command=false;storageState.writing=false;storageState.blocked=writeAttempted;
       storageState.local=writeAttempted?'保存未确认：请刷新重新连接':'● 数据未修改';busyUI(false);render();paintStorage();
       databaseToast(writeAttempted?'未确认保存：'+e.message+'。请刷新读取数据库最新状态后再操作。':'未保存：'+e.message);return {ok:false};

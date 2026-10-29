@@ -1,3 +1,5 @@
+> 简化产品重构：日常入口统一为今日、任务、项目、记录；快速记录支持语音与文字，确认保存后显示去向和查看入口。详见 [信息架构](docs/information-architecture.md)、[兼容策略](docs/migration-plan.md) 与 [改动记录](docs/refactor-changelog.md)。
+
 > 后续开发请先读 [开发交接清单](docs/DEVELOPER-HANDOFF.md)。本机授权交接的真实配置另存于被 Git 忽略的 `.local/HANDOFF-PRIVATE.md`。
 
 > 录音更新：AI Capture 改用后端 Gemini 语音转写，支持开始/结束录音与失败重试，文字确认后再交给 GPT 整理。详见 [语音转写说明](docs/VOICE-TRANSCRIPTION.md)。

@@ -10,7 +10,7 @@ test('Assistant B UI: preview, revise, cancel, confirm, voice text and mobile', 
  const browser=await chromium.launch({executablePath:process.env.CHROME_PATH||'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true});
  try{
   const page=await browser.newPage({viewport:{width:1440,height:1050}}),errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
-  await page.goto(f.url);await page.waitForFunction(()=>window.dashboardReady);await page.locator('#nav button').filter({hasText:'AI Capture'}).click();await page.getByRole('button',{name:'对话助手',exact:true}).click();
+  await page.goto(f.url);await page.waitForFunction(()=>window.dashboardReady);await page.evaluate(()=>nav('assistant'));
   await page.getByLabel('选择操作范围').selectOption('new');
   const send=async text=>{await page.getByLabel('告诉助手你的想法').fill(text);await page.getByRole('button',{name:'发送 →',exact:true}).click();await page.waitForFunction(()=>!assistantState.busy&&assistantState.proposal)};
   await send('观察光照对检测的影响');assert.equal((await f.store.read()).data.experiments.length,0);assert.equal(await page.locator('.assistant-change').count(),2);

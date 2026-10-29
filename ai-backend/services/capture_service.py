@@ -67,10 +67,18 @@ class CaptureService:
         client_id: str | None,
     ) -> CaptureContext:
         tz = timezone or self.settings.default_timezone
+        local_datetime = current_datetime or _now_iso(tz)
+        if current_datetime:
+            try:
+                parsed = datetime.fromisoformat(current_datetime.replace("Z", "+00:00"))
+                if parsed.tzinfo is not None:
+                    local_datetime = parsed.astimezone(_resolve_tz(tz)).isoformat()
+            except ValueError:
+                pass  # Existing validation/error behavior remains at the boundary.
         return CaptureContext(
             locale=locale or self.settings.default_locale,
             timezone=tz,
-            current_datetime=current_datetime or _now_iso(tz),
+            current_datetime=local_datetime,
             client_id=client_id or "",
         )
 

@@ -17,7 +17,7 @@ test('LIVE: browser → Dashboard proxy → configured AI Backend → GPT → pr
   const page=await browser.newPage({viewport:{width:1440,height:900}});await page.goto(f.url+'/#/aiCapture');await page.waitForFunction(()=>window.dashboardReady);
   const input='明天下午三点开会，晚上八点修改论文';await page.locator('#product-capture-text').fill(input);const started=performance.now();
   const responsePromise=page.waitForResponse(r=>r.url().endsWith('/api/ai/capture/text'));
-  await page.getByRole('button',{name:'整理为行动',exact:true}).click();const response=await responsePromise;const payload=await response.json();assert.equal(response.status(),200,JSON.stringify(payload));
+  await page.getByRole('button',{name:'整理一下',exact:true}).click();const response=await responsePromise;const payload=await response.json();assert.equal(response.status(),200,JSON.stringify(payload));
   await page.waitForFunction(()=>!captureUI.busy&&!!captureUI.preview);const elapsedMs=Math.round(performance.now()-started);assert.ok(payload.capture.items.length>0);assert.equal((await f.store.read()).revision,0);
   await mkdir(new URL('../.local/screenshots/',import.meta.url),{recursive:true});await page.screenshot({path:fileURLToPath(new URL('../.local/screenshots/merged-ai-live-preview.png',import.meta.url)),fullPage:true});
   // Confirm one generated record only; no writes to the user's configured database.

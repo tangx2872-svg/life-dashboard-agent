@@ -55,3 +55,8 @@ def test_service_starts_without_api_key():
     from app import create_app
 
     assert create_app() is not None
+
+
+def test_capture_context_normalizes_utc_to_user_timezone(client):
+    context = client.app.state.capture_service.build_context(locale="zh-CN", timezone="Asia/Shanghai", current_datetime="2026-10-29T23:00:00Z", client_id=None)
+    assert context.current_datetime.startswith("2026-10-30T07:00:00")

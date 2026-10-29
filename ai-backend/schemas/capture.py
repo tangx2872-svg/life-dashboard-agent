@@ -65,7 +65,7 @@ class CaptureItem(BaseModel):
         ...,
         min_length=1,
         max_length=32,
-        description="条目类型：优先 task（待办/需要执行）或 event（有明确时间的日程）",
+        description="条目类型：task（可执行行动）、project（长期方向）、record（事实或结果）",
     )
     title: str = Field(..., min_length=1, max_length=200, description="条目标题")
     # ISO 8601（日期或日期时间）；无法确定时填 null
@@ -105,7 +105,7 @@ CAPTURE_ITEM_JSON_SCHEMA: dict[str, Any] = {
     "properties": {
         "type": {
             "type": "string",
-            "description": "条目类型：优先 'task'（待办/需要执行）或 'event'（有明确时间的日程）",
+            "description": "条目类型：'task'（可执行行动）、'project'（长期方向）、'record'（事实或结果）",
         },
         "title": {"type": "string", "description": "条目标题，保留用户原意，去掉口语填充词"},
         "start_datetime": {
