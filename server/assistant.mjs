@@ -1,3 +1,4 @@
+import {reminderSuggestions,applyReminderChoices} from './assistant-reminders.mjs';
 import { readFileSync, existsSync } from 'node:fs';
 import { parseEnv } from 'node:util';
 import { randomUUID } from 'node:crypto';
@@ -11,12 +12,14 @@ const rules=vm.createContext({uid:randomUUID,assertDashboardData:validate,normal
 vm.runInContext(experimentSource,rules); // Trusted local business code only; never evaluate model output.
 const nullable={type:['string','null']};
 const fields=['id','expectedTitle','experiment','title','goal','content','result','supplement','project','roadmap','stage','description','category','icon','start','target','estimate','text','date','criteria','subtasks','milestone','index'];
-export const responseSchema={type:'object',additionalProperties:false,required:['type','message','operations','reason','facts','hypotheses','nextSteps'],properties:{
+export const responseSchema={type:'object',additionalProperties:false,required:['type','message','operations','reason','facts','hypotheses','nextSteps','reminders'],properties:{
   type:{type:'string',enum:['answer','clarify','proposal']},message:{type:'string'},reason:{type:'string'},facts:{type:'array',items:{type:'string'}},hypotheses:{type:'array',items:{type:'string'}},nextSteps:{type:'array',items:{type:'string'}},
+  reminders:{type:'array',items:{type:'object',additionalProperties:false,required:['title','at','note','basis'],properties:Object.fromEntries(['title','at','note','basis'].map(k=>[k,{type:'string'}]))}},
   operations:{type:'array',items:{type:'object',additionalProperties:false,required:['op','kind',...fields],properties:{op:{type:'string',enum:['add','update','delete']},kind:{type:'string',enum:['experiment','experiment_step','project','roadmap','project_stage','roadmap_stage','task','subtask','learning_task','note','event','inbox']},...Object.fromEntries(fields.map(k=>[k,['criteria','subtasks'].includes(k)?{type:['array','null'],items:{type:'string'}}:k==='milestone'?{type:['boolean','null']}:k==='index'?{type:['integer','null']}:nullable]))}}}
 }};
 function config(){const file=new URL('../.env',import.meta.url),env={...process.env,...(existsSync(file)?parseEnv(readFileSync(file,'utf8')):{})};return {key:env.OPENAI_API_KEY?.trim(),model:env.OPENAI_MODEL?.trim()||'gpt-4.1-mini'};}
 const instructions=`你是个人控制台的智能助手，用简洁中文交流。支持实验、长期事项和学习路线。用户选择的 scope 是唯一操作范围。
+当安排涉及明确时间时主动建议少量提醒，最多3条，输出 reminders：title、at（带时区的ISO时间）、note（起步动作）、basis（用户提供的时间依据）。没有明确时间先追问，不编造，不仅因截止日期就猜测提醒时刻。用户拒绝提醒或capture模式时为空数组。answer/clarify时reminders为空。提醒与方案一同预览，用户能调整时间或取消。
 idea 是从一句想法开始的范围：无需用户先分类。depth 为 capture 时只新增 inbox 保留原意；light 时少量行动，不把散步变成大项目；long 时分阶段。每轮最多追问两个关键问题，去公园不问专业年级，准备考研才问相关背景。缺少影响方案的信息先 clarify；不确定可先列待确认，不编日期。个人背景仅为用户自填的参考，必要时再次确认。当前没有天气、地图或网页检索工具，不得声称查过实时信息。
 idea 只能新增：一个 project 加其阶段/任务/笔记/节点，或一个 roadmap 加其阶段/任务，或仅 inbox。不能修改已有数据。任务安排只给当前最重要的1至3步，完整阶段可展开。
 你还负责动态计划调整：先了解用户可用时间、不可移动的截止日期和卡点。缺少关键约束先追问，不编造期限。给出最多3件下一步，估算用时且总量不得超过用户预算。不能实现的延期或调序必须说明，不能假装已修改。
@@ -104,30 +107,34 @@ export function createAssistant(store,{model=callModel,ready=()=>!!config().key}
       try{
         const state=await store.read(),selected=scopeContext(state.data,scope),experiment=selected||scope==='new'?null:state.data.experiments?.find(e=>e.id===scope);
         if(!selected&&scope!=='new'&&scope!=='idea'&&!experiment)throw new HttpError(404,'所选内容不存在');
-        const context={scope,depth,profile:useProfile?(state.data.personalProfile||null):null,selected,experiment,decisions:(state.data.decisions||[]).filter(d=>d.scope===scope).slice(-10),conversation:s.history.slice(-12),pendingDraft:previous?.revision===state.revision?previous.operations:null,message};
+        const context={scope,depth,now:new Date().toISOString(),timezone:'Asia/Shanghai',depth,existingReminders:(state.data.reminders||[]).filter(r=>r.scope===scope&&!r.done),profile:useProfile?(state.data.personalProfile||null):null,selected,experiment,decisions:(state.data.decisions||[]).filter(d=>d.scope===scope).slice(-10),conversation:s.history.slice(-12),pendingDraft:previous?.revision===state.revision?previous.operations:null,message};
         if(JSON.stringify(context).length>100000)throw new HttpError(413,'所选内容较长，请先精简或使用高级工具分批处理。');
         const answer=await model(context);
         if(!answer||!['answer','clarify','proposal'].includes(answer.type)||typeof answer.message!=='string'||answer.message.length>12000||!Array.isArray(answer.operations))throw new HttpError(502,'助手返回内容不完整，请重试。');
         if((await store.read()).revision!==state.revision)throw new HttpError(409,'讨论期间数据已变化，请刷新后重新生成建议。');
         if(answer.type==='proposal'){
           if(scope==='idea'&&depth==='capture'&&answer.operations.some(x=>x.kind!=='inbox'))throw new HttpError(422,'只记下来模式不能创建计划');
-          const plan=buildProposal(state.data,scope,answer.operations);
+          const plan=answer.operations.length?buildProposal(state.data,scope,answer.operations):{candidate:structuredClone(state.data),cards:[],targetId:selected?.record?.id||experiment?.id||null,targetKind:selected?.type||'experiment'};
+          if(!answer.operations.length&&['idea','new','new-project','new-roadmap'].includes(scope))throw new HttpError(422,'请先形成目标方案');
+          if(depth==='capture'&&(answer.reminders||[]).length)throw new HttpError(422,'只记录模式不创建提醒');
+          plan.reminders=reminderSuggestions(answer.reminders||[],plan.targetId?(plan.targetKind==='experiment'?plan.targetId:plan.targetKind+':'+plan.targetId):scope);
+          if(!plan.cards.length&&!plan.reminders.length)throw new HttpError(422,'没有待确认修改');
           const reasoning={reason:typeof answer.reason==='string'?answer.reason:answer.message,facts:Array.isArray(answer.facts)?answer.facts:[],hypotheses:Array.isArray(answer.hypotheses)?answer.hypotheses:[],nextSteps:Array.isArray(answer.nextSteps)?answer.nextSteps:[]};
           if(JSON.stringify(reasoning).length>20000||Object.values(reasoning).some(v=>Array.isArray(v)&&v.some(x=>typeof x!=='string')))throw new HttpError(422,'建议说明格式错误');
           plan.candidate.decisions=[...(state.data.decisions||[]),{id:randomUUID(),scope:scope==='idea'||scope.startsWith('new')?(plan.targetKind==='experiment'?plan.targetId:plan.targetKind+':'+plan.targetId):scope,createdAt:new Date().toISOString(),request:message,...reasoning,changes:plan.cards.map(c=>({op:c.op,kind:c.kind,title:c.title}))}];
           plan.reasoning=reasoning;
           s.draft={...plan,operations:answer.operations,revision:state.revision,id:randomUUID(),requestId:randomUUID(),expiresAt:Date.now()+ttl};
-        }else if(answer.operations.length)throw new HttpError(502,'回答中出现了未确认的操作，已阻止。');
+        }else if(answer.operations.length||(answer.reminders||[]).length)throw new HttpError(502,'回答中出现了未确认的操作，已阻止。');
         s.history.push({role:'user',text:message},{role:'assistant',text:answer.message});s.history=s.history.slice(-12);
-        return {sessionId,type:answer.type,message:answer.message,proposal:s.draft?{id:s.draft.id,cards:s.draft.cards,reasoning:s.draft.reasoning,revision:s.draft.revision,expiresAt:s.draft.expiresAt}:null};
+        return {sessionId,type:answer.type,message:answer.message,proposal:s.draft?{id:s.draft.id,cards:s.draft.cards,reasoning:s.draft.reasoning,reminders:s.draft.reminders,revision:s.draft.revision,expiresAt:s.draft.expiresAt}:null};
       }finally{s.busy=false;s.touched=Date.now();}
     },
-    async commit({sessionId,proposalId,confirmed}){
+    async commit({sessionId,proposalId,confirmed,reminders}){
       const s=get(sessionId),p=s.draft;
       if(s.busy)throw new HttpError(409,'助手正在处理，请稍候。');
       if(confirmed!==true||!p||p.id!==proposalId||p.expiresAt<Date.now())throw new HttpError(409,'草案已失效或尚未确认，请重新生成。');
       s.busy=true;try{
-        const saved=await store.commit({data:p.candidate,revision:p.revision,requestId:p.requestId,reason:'智能助手：用户确认修改'});
+        const saved=await store.commit({data:applyReminderChoices(p.candidate,p.reminders||[],reminders),revision:p.revision,requestId:p.requestId,reason:'智能助手：用户确认修改'});
         s.draft=null;s.history.push({role:'assistant',text:'用户已确认，以上草案已保存。'});
         return {...saved,targetId:p.targetId,targetKind:p.targetKind,counts:Object.fromEntries(['add','update','delete'].map(op=>[op,p.cards.filter(c=>c.op===op).length]))};
       }finally{s.busy=false;}
