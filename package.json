@@ -10,7 +10,9 @@
     "start": "node --env-file-if-exists=.env server/index.mjs",
     "test": "node --env-file-if-exists=.env --test tests/*.test.mjs",
     "local:mysql": "node scripts/local-mysql.mjs",
-    "stop:mysql": "node scripts/local-mysql.mjs stop"
+    "stop:mysql": "node scripts/local-mysql.mjs stop",
+    "build": "node scripts/check-frontend.mjs --build",
+    "lint": "node scripts/check-frontend.mjs"
   },
   "dependencies": {
     "mysql2": "3.24.6"
