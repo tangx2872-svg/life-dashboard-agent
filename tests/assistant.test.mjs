@@ -25,7 +25,7 @@ test('Assistant confirmation, cancellation, stale draft and HTTP safeguards with
   api.cancel({sessionId:r.sessionId});await assert.rejects(api.commit({sessionId:r.sessionId,proposalId:r.proposal.id,confirmed:true}));
   r=await api.turn({scope,sessionId:r.sessionId,message:'重新修改'});const old=r.proposal.id;
   r=await api.turn({scope,sessionId:r.sessionId,message:'继续调整'});await assert.rejects(api.commit({sessionId:r.sessionId,proposalId:old,confirmed:true}));
-  await api.commit({sessionId:r.sessionId,proposalId:r.proposal.id,confirmed:true});assert.equal((await f.store.read()).data.experiments[0].steps[0].content,'固定参数并记录照度');assert.ok((await f.store.snapshots()).length>=2);
+  await api.commit({sessionId:r.sessionId,proposalId:r.proposal.id,confirmed:true});assert.equal((await f.store.read()).data.experiments[0].steps[0].content,'固定参数并记录照度');assert.equal((await f.store.read()).data.decisions.length,1);assert.equal((await f.store.read()).data.decisions[0].reason,'请确认');assert.ok((await f.store.snapshots()).length>=2);
   await assert.rejects(api.commit({sessionId:r.sessionId,proposalId:r.proposal.id,confirmed:true}));
   reply.operations=[{...update(d),content:'另一个草案'}];r=await api.turn({scope,sessionId:r.sessionId,message:'再修改'});
   const state=await f.store.read();state.data.experiments[0].goal='其他页面修改';await f.store.commit({data:state.data,revision:state.revision,requestId:randomUUID(),reason:'concurrent test'});

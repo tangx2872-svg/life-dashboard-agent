@@ -7,3 +7,5 @@
 @media(max-width:680px){.assistant-scope{padding:14px}.assistant-scope label{display:block;width:100%}.assistant-scope select{max-width:100%;margin-top:8px}.assistant-panel-head,.assistant-messages,.assistant-compose{padding:16px}.assistant-change{margin:12px;padding:14px}.assistant-confirm{padding:16px}.assistant-heading{align-items:start}.assistant-heading h1{font-size:28px}.assistant-status{font-size:11px}.assistant-message.user{margin-left:14px}}
 
 .assistant-privacy{font-size:12px;line-height:1.7;color:#65735f;margin:12px 0 0;padding:10px 12px;background:#f3f6ee;border-radius:8px}
+
+.assistant-reasoning{margin:16px 20px;padding:18px;background:#edf3e6;border-radius:12px;line-height:1.8;overflow-wrap:anywhere}.assistant-reasoning h4{margin-top:12px}
