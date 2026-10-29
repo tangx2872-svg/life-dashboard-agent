@@ -12,7 +12,13 @@
     "local:mysql": "node scripts/local-mysql.mjs",
     "stop:mysql": "node scripts/local-mysql.mjs stop",
     "build": "node scripts/check-frontend.mjs --build",
-    "lint": "node scripts/check-frontend.mjs"
+    "lint": "node scripts/check-frontend.mjs",
+    "start:integrated": "node scripts/start-integrated.mjs --ai=external",
+    "start:full": "node scripts/start-integrated.mjs --ai=local",
+    "start:mock": "node scripts/start-integrated.mjs --ai=mock",
+    "test:integration": "node --env-file-if-exists=.env --test tests/ai-stack.integration.mjs",
+    "test:ai": "node scripts/test-ai.mjs",
+    "test:live": "node --env-file-if-exists=.env --test tests/ai-live.integration.mjs"
   },
   "dependencies": {
     "mysql2": "3.24.6"

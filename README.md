@@ -1,3 +1,5 @@
+> AI 后端源码已合并到 `ai-backend/`，保留 Python 服务和 Node/MySQL 主站边界。支持现有 AutoDL 连接、本地双服务启动与独立整合测试，详见 [AI 整合与验收说明](docs/AI-INTEGRATION.md)。
+
 > 2026-10-29 产品前端更新：今日专注、任务抽屉、项目下一步、命令搜索、周回顾、手机导航与 AI 编辑确认流程已接入。正式 AI Backend 联调成功；只有用户确认后才保存。详见 [前端审计](docs/FRONTEND-AUDIT.md) 与 [验收结果和限制](docs/FRONTEND-RESULTS.md)。
 
 # Life Dashboard 独立本地版
