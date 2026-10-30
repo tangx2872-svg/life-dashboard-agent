@@ -1,6 +1,7 @@
 """Latency-aware, process-local model router for Life proposals.
 
 No Redis, no mesh: a sliding window plus a small circuit breaker is enough for one box.
+Each tier is an ordered failover chain, e.g. DeepSeek -> Luna -> GLM.
 """
 from __future__ import annotations
 
@@ -29,10 +30,20 @@ class ModelTarget:
     @property
     def supports_reasoning(self) -> bool:
         name = self.model.lower()
-        return name.startswith(("gpt-5", "gpt-6")) or "glm" in name
+        return name.startswith(("gpt-5", "gpt-6")) or "glm" in name or "deepseek" in name
 
     def describe(self) -> dict:
         return {"model": self.model, "tier": self.tier, "role": self.role, "effort": self.effort}
+
+
+def _models(value: str | None) -> list[str]:
+    """Ordered, de-duplicated model list from a comma-separated env value."""
+    names: list[str] = []
+    for item in (value or "").split(","):
+        name = item.strip()
+        if name and name not in names:
+            names.append(name)
+    return names
 
 
 class LifeModelRouter:
@@ -55,11 +66,14 @@ class LifeModelRouter:
             "FAST": [ModelTarget(fast, fast_effort, "FAST", "primary")],
             "PLANNER": [ModelTarget(planner, planner_effort, "PLANNER", "primary")],
         }
-        if fast_fallback:
-            tiers["FAST"].append(ModelTarget(fast_fallback, planner_effort, "FAST", "fallback"))
-        if planner_fallback:
-            tiers["PLANNER"].append(ModelTarget(planner_fallback, fast_effort, "PLANNER", "fallback"))
-        return cls({tier: [t for i, t in enumerate(rows) if t.model and t.model not in [r.model for r in rows[:i]]] for tier, rows in tiers.items()})
+        # Fallbacks are an ordered chain (DeepSeek -> Luna -> GLM), not a single spare.
+        for model in _models(fast_fallback):
+            if model != fast:
+                tiers["FAST"].append(ModelTarget(model, fast_effort, "FAST", "fallback"))
+        for model in _models(planner_fallback):
+            if model != planner:
+                tiers["PLANNER"].append(ModelTarget(model, planner_effort, "PLANNER", "fallback"))
+        return cls({tier: [t for t in rows if t.model] for tier, rows in tiers.items()})
 
     def candidates(self, tier: str) -> list[ModelTarget]:
         rows = self.tiers.get(tier) or []
