@@ -45,3 +45,27 @@ def test_default_request_has_no_forced_plan_text():
     recorder=RecordingResponses();service.client=SimpleNamespace(responses=recorder)
     asyncio.run(service.propose(LifeRequest(text='明天下午三点修改论文摘要',context={})))
     assert '不得追问' not in recorder.captured['instructions']
+
+
+def test_fast_and_planner_use_separate_prompts_and_limits():
+    from api.life_proposal_routes import FAST_INSTRUCTIONS,PLANNER_INSTRUCTIONS
+    assert FAST_INSTRUCTIONS!=PLANNER_INSTRUCTIONS
+    assert '快速任务规划器' in FAST_INSTRUCTIONS and '全局重排' not in FAST_INSTRUCTIONS
+    assert '全局重排' in PLANNER_INSTRUCTIONS
+    fast=object.__new__(LifeLLMService);fast.model='test';fast.provider='mock'
+    fast_recorder=RecordingResponses();fast.client=SimpleNamespace(responses=fast_recorder)
+    result=asyncio.run(fast.propose(LifeRequest(text='明天下午三点修改论文摘要，45分钟',context={},tier='FAST')))
+    assert result['tier']=='FAST'
+    assert fast_recorder.captured['instructions']==FAST_INSTRUCTIONS
+    assert fast_recorder.captured['max_output_tokens']==2500
+    assert result['timings']['generation_ms']>=0 and result['timings']['total_ms']>=0
+    planner=object.__new__(LifeLLMService);planner.model='test';planner.provider='mock'
+    slow_recorder=RecordingResponses();planner.client=SimpleNamespace(responses=slow_recorder)
+    asyncio.run(planner.propose(LifeRequest(text='重新安排下周所有任务',context={})))
+    assert slow_recorder.captured['instructions']==PLANNER_INSTRUCTIONS
+    assert slow_recorder.captured['max_output_tokens']==7000
+
+def test_tier_heuristic_only_for_simple_requests():
+    assert LifeLLMService._tier('明天下午三点修改论文摘要，45分钟')=='FAST'
+    assert LifeLLMService._tier('帮我重新安排下周论文、六级和健身，每天别太满')=='PLANNER'
+    assert LifeLLMService._tier('今天晚上七点健身一个小时')=='FAST'

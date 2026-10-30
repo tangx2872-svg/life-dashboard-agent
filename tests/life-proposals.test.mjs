@@ -1,4 +1,4 @@
-import test from 'node:test';import assert from 'node:assert/strict';import {emptyData} from '../server/schema.mjs';import {applyLifeActions,createLifeProposalService,buildLifeContext,shouldForcePlan} from '../server/life-proposals.mjs';
+import test from 'node:test';import assert from 'node:assert/strict';import {emptyData} from '../server/schema.mjs';import {applyLifeActions,createLifeProposalService,buildLifeContext,shouldForcePlan,chooseTier} from '../server/life-proposals.mjs';
 const operation=(action,extra={})=>({action,targetId:null,projectId:null,clientRef:null,title:null,date:null,minutes:null,priority:null,description:null,status:null,...extra});
 function fixture(){let state={data:emptyData(),revision:0};state.data.projects.push({id:'paper',title:'工业视觉论文',phases:[],notes:[],status:'进行中'});state.data.tasks.push({id:'task1',title:'原任务',projectId:'paper',done:false,subtasks:[]});return {store:{read:async()=>structuredClone(state),commit:async p=>{if(p.revision!==state.revision)throw Error('conflict');state={data:p.data,revision:state.revision+1};return {revision:state.revision}}},get:()=>state}}
 test('Life Actions: create/update/project/date and reject illegal or foreign IDs',()=>{const {get}=fixture(),base=get().data;let d=applyLifeActions(base,[operation('create_task',{title:'摘要',projectId:'paper',date:'2026-11-02',minutes:45})]);assert.equal(d.tasks.length,2);assert.equal(base.tasks.length,1);d=applyLifeActions(d,[operation('update_task',{targetId:'task1',title:'修改后的任务'}),operation('reschedule_task',{targetId:'task1',date:'2026-11-03'}),operation('update_project',{targetId:'paper',priority:'high'})]);assert.equal(d.tasks[0].scheduledDate,'2026-11-03');assert.equal(d.projects[0].priority,'high');d=applyLifeActions(d,[operation('create_project',{title:'新项目',clientRef:'new:1'}),operation('create_task',{title:'第一步',projectId:'new:1'})]);assert.equal(d.tasks.at(-1).projectId,d.projects.at(-1).id);for(const o of [{action:'delete_task',targetId:'task1'},operation('update_task',{targetId:'foreign'}),operation('create_task',{title:'x',projectId:'foreign'}),operation('reschedule_task',{targetId:'task1',date:'2026-02-30'}),{...operation('update_task',{targetId:'task1'}),sql:'DROP'}])assert.throws(()=>applyLifeActions(base,[o]));assert.equal(base.tasks[0].title,'原任务')});
@@ -22,7 +22,7 @@ test('Clarification guard: one forced retry turns clarification into a plan',asy
   const service=createLifeProposalService({store:f.store,ai,memory:{read:async()=>[]},userId:'A'});
   const reply=await service.turn({message:'明天下午三点修改论文摘要，45分钟'});
   assert.equal(calls.length,2);
-  assert.deepEqual(calls[1],{forcePlan:true});
+  assert.deepEqual(calls[1],{tier:'FAST',forcePlan:true});
   assert.equal(reply.intent,'plan');
   assert.equal(reply.operations.length,1);
   assert.equal(f.get().revision,0);
@@ -34,4 +34,33 @@ test('Clarification guard: retry happens at most once',async()=>{
   const reply=await service.turn({message:'明天下午三点修改论文摘要'});
   assert.equal(reply.intent,'clarify');
   assert.equal(reply.operations.length,0);
+});
+
+test('Tier: simple single requests stay FAST, global re-planning goes PLANNER',()=>{
+  assert.equal(chooseTier({message:'明天下午三点修改论文摘要，45分钟'}),'FAST');
+  assert.equal(chooseTier({message:'明天下午三点修改论文摘要45分钟，晚上七点健身一个小时'}),'FAST');
+  assert.equal(chooseTier({message:'这个延期到周五上午十点，改成60分钟',currentTaskId:'task1'}),'FAST');
+  assert.equal(chooseTier({message:'重新把这个任务延期到周五'}),'FAST');
+  assert.equal(chooseTier({message:'帮我重新安排下周论文、六级和健身，每天别太满'}),'PLANNER');
+  assert.equal(chooseTier({message:'看看今天安排',scope:'global'}),'PLANNER');
+});
+test('Context: FAST sends a smaller slice than PLANNER',()=>{
+  const state={data:emptyData(),revision:0};
+  for(let i=0;i<12;i++)state.data.projects.push({id:'p'+i,title:'项目'+i,status:'进行中',phases:[{id:'x',title:'阶段',status:'未开始'}],description:'d'});
+  for(let i=0;i<40;i++)state.data.tasks.push({id:'t'+i,title:'任务'+i,projectId:'p'+(i%12),done:false,scheduledDate:'2026-11-'+String((i%28)+1).padStart(2,'0'),estimatedMinutes:45});
+  state.data.history=Array.from({length:10},(_,i)=>({title:'记录'+i,date:'2026-10-2'+i,projectId:'p0'}));
+  state.data.events=[{id:'e1',projectId:'p0',title:'里程碑',date:'2026-12-01'}];
+  state.data.plannerProfile={dailyMinutes:180,restDays:['周六'],customNote:'x'.repeat(50)};
+  const fast=buildLifeContext(state,'明天下午三点修改论文摘要，45分钟',{currentProjectId:'p0',tier:'FAST'});
+  const planner=buildLifeContext(state,'重新安排下周所有任务',{scope:'global',tier:'PLANNER'});
+  assert.equal(fast.tier,'FAST');
+  assert.ok(fast.projects.length<=5);
+  assert.ok(fast.tasks.length<=8);
+  assert.equal(fast.recentActivity,undefined);
+  assert.deepEqual(Object.keys(fast.preferences).sort(),['dailyMinutes','restDays']);
+  assert.ok(planner.projects.length<=16);
+  assert.ok(planner.tasks.length<=45);
+  assert.ok(Array.isArray(planner.recentActivity));
+  assert.equal(planner.preferences.customNote.length,50);
+  assert.ok(fast.relevantConversation.length<=2);
 });
