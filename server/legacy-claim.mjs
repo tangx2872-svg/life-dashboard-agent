@@ -1,0 +1,2 @@
+import {HttpError} from './store.mjs';import {hash_password} from './accounts.mjs';
+export async function claimLegacy(accounts,password){if(typeof password!=='string'||password.length<10||password.length>128)throw new HttpError(422,'密码需10至128位');const hash=await hash_password(password);const [result]=await accounts.pool.execute('UPDATE users SET password_hash=?,status=? WHERE username=?',[hash,'active','legacy_owner']);if(result.affectedRows!==1)throw new HttpError(404,'旧账户不存在');return {ok:true}}

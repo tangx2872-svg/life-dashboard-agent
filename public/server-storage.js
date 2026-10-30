@@ -66,8 +66,9 @@ safetyCheckpoint=function(label){storageState.reason=label;return fullBackupEnve
 downloadCheckpoint=async function(){try{const rows=await (await fetch('/api/snapshots')).json();if(!rows.length)return toast('尚无操作前快照。');const response=await fetch('/api/snapshots/'+rows[0].revision);if(!response.ok)throw Error('快照读取失败');downloadValue(await response.json(),'Life-Dashboard-before-change.json');}catch(e){toast(e.message)}};
 backup=async function(){try{const response=await fetch('/api/backup');if(!response.ok)throw Error('无法读取数据库备份');downloadValue(await response.json(),'Life-Dashboard-full-'+today()+'.json');toast('已从 MySQL 导出完整备份。');}catch(e){toast('备份未下载：'+e.message)}};
 async function initSaving(){
-  const box=document.createElement('section');box.className='storage-panel';box.innerHTML='<h3>数据库保存</h3><div id="save-status" role="status" aria-live="polite"></div><button onclick="location.reload()">重新连接 / 刷新</button><button onclick="backup()">导出完整备份</button><button onclick="document.getElementById(\'import\').click()">从旧站备份恢复</button><button onclick="downloadCheckpoint()">下载操作前快照</button><small>内容保存在 MySQL，关闭浏览器不会删除。每次修改自动保留操作前状态（最近 30 次）。</small>';
-  document.querySelector('.sidebar-bottom').prepend(box);document.querySelectorAll('.sidebar-bottom > button,.sidebar-bottom > .saved').forEach(x=>x.hidden=true);
+  // Technical storage details live in 我 → 开发者, never in the ordinary sidebar.
+  const box=document.createElement('section');box.id='storage-panel';box.className='storage-panel';box.hidden=true;box.innerHTML='<h3>数据库保存</h3><div id="save-status" role="status" aria-live="polite"></div><button onclick="location.reload()">重新连接 / 刷新</button><button onclick="backup()">导出完整备份</button><button onclick="document.getElementById(\'import\').click()">从旧站备份恢复</button><button onclick="downloadCheckpoint()">下载操作前快照</button><small>内容保存在 MySQL，关闭浏览器不会删除。每次修改自动保留操作前状态（最近 30 次）。</small>';
+  document.body.append(box);document.querySelectorAll('.sidebar-bottom > button,.sidebar-bottom > .saved').forEach(x=>x.hidden=true);
   document.getElementById('import').onchange=async event=>{try{await restoreBackupFile(event.target.files[0])}catch(e){toast('未恢复：'+e.message)}finally{event.target.value=''}};
   window.addEventListener('beforeunload',event=>{if(storageState.writing){event.preventDefault();event.returnValue='';}});
   paintStorage();

@@ -18,6 +18,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from api.routes import router
+from api.agent_routes import router as agent_router
 from core.config import ensure_runtime_dirs, get_settings
 from core.errors import AppError, ErrorCode
 from core.logging import get_logger, setup_logging
@@ -71,6 +72,7 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
     application.include_router(router)
+    application.include_router(agent_router)
     _register_exception_handlers(application)
     return application
 

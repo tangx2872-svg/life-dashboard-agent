@@ -67,8 +67,8 @@ function productReview(){
   const start=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   const rows=data.history.filter(h=>h.date.slice(0,10)>=start&&h.date.slice(0,10)<=today());
   const overdue=data.tasks.filter(t=>!t.done&&taskDate(t)&&taskDate(t)<today());
-  return heading('本周回顾',start+' 至 '+today())
-    +`<section class="product-panel"><div class="product-stat"><div><b>${rows.length}</b><small>完成记录</small></div><div><b>${new Set(rows.map(h=>h.date.slice(0,10))).size}</b><small>有完成记录的天数</small></div><div><b>${data.todayFocus?.date===today()?data.todayFocus.taskIds.length:0}</b><small>今天的安排</small></div><div><b>${overdue.length}</b><small>需要重新安排</small></div></div><p class="product-hint">统计来自真实完成记录，不推测工作时长。</p></section>`
-    +`<section class="product-panel"><div class="ui-head"><h2>这周走过的路<span class="ui-count">${rows.length}</span></h2></div>${rows.map(h=>`<div class="product-row"><span class="hist-mark">✓</span><div class="grow"><strong>${esc(h.title)}</strong><small>${esc(h.date)} · ${esc(h.projectTitle||'日常')}</small></div></div>`).join('')||'<div class="ui-empty"><strong>这一周还没有完成记录</strong><p>一个小行动也算进展，完成它就会出现在这里。</p></div>'}</section>`
-    +`<section class="product-panel"><div class="ui-head"><h2>重新安排，而不是堆积<span class="ui-count">${overdue.length}</span></h2></div>${overdue.length?productTaskRows(productTaskSort(overdue),{grouped:false}):'<p class="product-hint">没有积压的任务，节奏很好。</p>'}</section>`;
+  return heading('回顾',start+' 至 '+today())
+    +`<section class="stat-row"><div><b>${rows.length}</b><small>完成的事</small></div><div><b>${new Set(rows.map(h=>h.date.slice(0,10))).size}</b><small>有进展的天数</small></div><div><b>${overdue.length}</b><small>需要重新安排</small></div></section>`
+    +`<section class="plan-group"><h3>这周完成的</h3>${rows.length?`<ul class="today-list">${rows.map(h=>`<li><span class="tick">✓</span><div class="grow"><strong>${esc(h.title)}</strong><small>${esc(h.date)} · ${esc(historyProject(h))}</small></div></li>`).join('')}</ul>`:'<p class="quiet">这周还没有完成记录。一个小行动也算进展。</p>'}</section>`
+    +`<section class="plan-group"><h3>需要重新安排</h3>${overdue.length?productTaskRows(productTaskSort(overdue),{grouped:false}):'<p class="quiet">没有积压，节奏很好。</p>'}</section>`;
 }
