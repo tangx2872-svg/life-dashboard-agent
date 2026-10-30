@@ -12,7 +12,7 @@ function interactionContinue(){const questions=life.result.questions||[];if(ques
 const interactionActionLabel={create_task:'新增任务',reschedule_task:'调整时间',update_task:'修改任务',create_project:'新建项目',update_project:'修改项目'};
 const interactionTasks=()=>typeof data!=='undefined'&&Array.isArray(data&&data.tasks)?data.tasks:[];
 const interactionProjects=()=>typeof data!=='undefined'&&Array.isArray(data&&data.projects)?data.projects:[];
-function interactionWhen(date){if(!date)return '';const parts=String(date).split('-');if(parts.length<3)return String(date);return `${Number(parts[1])} 月 ${Number(parts[2])} 日 · ${lifeWeekday(date)}`}
+function interactionWhen(date,time){if(!date)return '';const parts=String(date).split('-');if(parts.length<3)return String(date);const head=`${Number(parts[1])} 月 ${Number(parts[2])} 日`;return time?`${head} · ${time}`:`${head} · ${lifeWeekday(date)}`}
 function interactionMinutes(op){const value=op?.minutes??op?.estimatedMinutes??op?.durationMinutes;return Number.isFinite(value)&&value>0?Math.round(value):null}
 // operations are the only source of truth for the plan preview.
 function interactionPlanRows(r){
@@ -31,7 +31,8 @@ function interactionPlanRows(r){
     const projectId=op.projectId||task?.projectId||'';
     const project=created.get(projectId)||interactionProjects().find(p=>p.id===projectId)?.title||'';
     const date=op.date||(op.action==='create_task'?'':task?.scheduledDate||task?.dueDate||task?.date||'');
-    rows.push({label,title:op.title||task?.title||'任务',when:interactionWhen(date),minutes:interactionMinutes(op),note:project});
+    const time=op.time||(op.action==='create_task'?'':task?.time||'');
+    rows.push({label,title:op.title||task?.title||'任务',when:interactionWhen(date,time),minutes:interactionMinutes(op),note:project});
   }
   return rows
 }

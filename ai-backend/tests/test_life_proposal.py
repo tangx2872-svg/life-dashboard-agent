@@ -28,7 +28,7 @@ class RecordingResponses:
     async def create(self,**kwargs):
         self.captured.update(kwargs)
         async def events():
-            yield SimpleNamespace(type='response.output_text.delta',delta=json.dumps({'summary':'test','intent':'plan','message':'安排好了','operations':[{'action':'create_task','targetId':None,'projectId':None,'clientRef':None,'title':'修改论文摘要','date':'2026-11-02','minutes':45,'priority':None,'description':None,'status':None}],'warnings':[],'understanding':'明天下午改摘要','questions':[],'adjustments':[]}))
+            yield SimpleNamespace(type='response.output_text.delta',delta=json.dumps({'summary':'test','intent':'plan','message':'安排好了','operations':[{'action':'create_task','targetId':None,'projectId':None,'clientRef':None,'title':'修改论文摘要','date':'2026-11-02','time':None,'minutes':45,'priority':None,'description':None,'status':None}],'warnings':[],'understanding':'明天下午改摘要','questions':[],'adjustments':[]}))
             yield SimpleNamespace(type='response.completed')
         return events()
 
@@ -69,3 +69,16 @@ def test_tier_heuristic_only_for_simple_requests():
     assert LifeLLMService._tier('明天下午三点修改论文摘要，45分钟')=='FAST'
     assert LifeLLMService._tier('帮我重新安排下周论文、六级和健身，每天别太满')=='PLANNER'
     assert LifeLLMService._tier('今天晚上七点健身一个小时')=='FAST'
+
+
+def test_exact_time_field_accepts_hh_mm_and_rejects_natural_language():
+    from api.life_proposal_routes import LifeOperation,LifeProposal,FAST_INSTRUCTIONS
+    base={'action':'create_task','targetId':None,'projectId':None,'clientRef':None,'title':'修改论文摘要','date':'2026-10-31','time':'15:00','minutes':45,'priority':None,'description':None,'status':None}
+    op=LifeOperation(**base)
+    assert op.time=='15:00'
+    for bad in ('3pm','15:00:00','下午三点','24:00'):
+        with pytest.raises(Exception):
+            LifeOperation(**{**base,'time':bad})
+    assert LifeOperation(**{**base,'time':None}).time is None
+    assert 'time' in LifeProposal.model_json_schema()['$defs']['LifeOperation']['required']
+    assert '24小时制HH:MM' in FAST_INSTRUCTIONS

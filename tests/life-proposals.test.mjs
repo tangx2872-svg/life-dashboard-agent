@@ -79,3 +79,18 @@ test('Clarification: answering a question forces a plan instead of asking again'
   assert.deepEqual(second.proposalId,first.proposalId,'revision keeps the same proposal id');
   assert.equal(second.proposalVersion,2);
 });
+
+test('Exact time: operations reuse the existing task.time field',()=>{
+  const {get}=fixture(),base=get().data;
+  let d=applyLifeActions(base,[operation('create_task',{title:'修改论文摘要',projectId:'paper',date:'2026-10-31',time:'15:00',minutes:45})]);
+  assert.equal(d.tasks.at(-1).time,'15:00');
+  d=applyLifeActions(d,[operation('reschedule_task',{targetId:'task1',date:'2026-11-06',time:'10:00'})]);
+  assert.equal(d.tasks[0].time,'10:00');
+  assert.equal(d.tasks[0].scheduledDate,'2026-11-06');
+  assert.equal(d.tasks[1].title,'修改论文摘要');
+  assert.throws(()=>applyLifeActions(base,[operation('create_task',{title:'x',time:'3pm'})]),/计划时间不正确/);
+  assert.throws(()=>applyLifeActions(base,[operation('create_task',{title:'x',time:'24:00'})]),/计划时间不正确/);
+  const ctx=buildLifeContext({data:{...get().data,tasks:[{...base.tasks[0],time:'10:00'}]},revision:0},'这个任务',{currentTaskId:'task1',tier:'FAST'});
+  assert.equal(ctx.tasks[0].time,'10:00');
+  assert.equal(ctx.currentTask.id,'task1');
+});

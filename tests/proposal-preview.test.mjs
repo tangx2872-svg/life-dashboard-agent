@@ -86,3 +86,17 @@ test('Proposal id: a brand new request does not resubmit the old proposal', asyn
   await ctx.lifeTurn('明天下午三点修改论文摘要，45分钟');
   assert.equal(JSON.parse(requests[0].options.body).proposalId, undefined);
 });
+
+test('Preview: exact time is shown when the operation carries one', () => {
+  const html = harness({
+    intent: 'plan', summary: '安排', understanding: '明天下午改摘要', message: '好',
+    adjustments: [], warnings: [], questions: [],
+    operations: [
+      operation('create_task', {title: '修改论文摘要', projectId: 'p1', date: '2026-11-02', time: '15:00', minutes: 45}),
+      operation('create_task', {title: '全文检查', projectId: 'p1', date: '2026-11-06', minutes: 45})
+    ]
+  }).lifeResult();
+  assert.match(html, /11 月 2 日 · 15:00/);
+  assert.match(html, /11 月 6 日 · 周五/);
+  assert.doesNotMatch(html, /undefined/);
+});
