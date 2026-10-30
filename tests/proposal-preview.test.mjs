@@ -7,7 +7,7 @@ const source = await readFile(new URL('../public/agent-interaction.js', import.m
 const operation = (action, extra = {}) => ({action, targetId: null, projectId: null, clientRef: null, title: null, date: null, minutes: null, priority: null, description: null, status: null, ...extra});
 const escape = value => String(value ?? '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
 
-function harness(result, phase = 'review') {
+function harness(result, phase = 'review', requests = [], reply = {intent: 'plan', message: '好的', operations: [], questions: [], adjustments: [], warnings: [], proposalId: 'p2', proposalVersion: 3}) {
   const noop = () => {};
   const context = {
     life: {phase, result, text: '', error: ''},
@@ -17,10 +17,12 @@ function harness(result, phase = 'review') {
     },
     esc: escape,
     lifeWeekday: date => ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][new Date(date + 'T00:00:00Z').getUTCDay()],
+    AbortController, AbortSignal,
     lifeDismiss: noop, lifeRefresh: noop, render: noop, toast: noop, lifeTurn: noop,
     lifeDraftInput: noop, lifeComposer: () => '', lifePhaseText: () => '', lifeResult: () => '',
     lifeApply: noop, submitLifeInput: noop, dashboardBoot: {supportsLifeProposals: true},
-    productAPI: {request: async () => ({})}, lifeCoreContext: () => ({})
+    lifeCoreContext: () => ({}),
+    productAPI: {request: async (url, options) => {requests.push({url, options}); return reply}}
   };
   context.globalThis = context;
   vm.createContext(context);
@@ -61,4 +63,26 @@ test('Preview: empty operations show no confirmable plan', () => {
   assert.match(html, /没有需要改动的安排/);
   assert.doesNotMatch(html, /旧协议阶段/);
   assert.match(html, /<button class="primary"[^>]*disabled/);
+});
+
+test('Proposal id: review and clarification turns revise the same proposal', async () => {
+  const requests = [];
+  const ctx = harness({intent: 'plan', message: '看看', operations: [operation('create_task', {title: 'x', date: '2026-11-02'})], proposalId: 'p1', proposalVersion: 2}, 'review', requests);
+  await ctx.lifeTurn('提前到上午');
+  assert.equal(JSON.parse(requests[0].options.body).proposalId, 'p1');
+  assert.equal(ctx.life.result.proposalId, 'p2', 'new proposal id replaces the old one immediately');
+});
+
+test('Proposal id: clarification continue carries the same proposal', async () => {
+  const requests = [];
+  const ctx = harness({intent: 'clarify', message: '玩几天？', understanding: '春节去四川', operations: [], questions: [], proposalId: 'p9', proposalVersion: 1}, 'clarifying', requests);
+  await ctx.lifeTurn('准备玩几天？：5 天');
+  assert.equal(JSON.parse(requests[0].options.body).proposalId, 'p9');
+});
+
+test('Proposal id: a brand new request does not resubmit the old proposal', async () => {
+  const requests = [];
+  const ctx = harness({intent: 'plan', message: '已安排', operations: [], proposalId: 'p1', proposalVersion: 2}, 'done', requests);
+  await ctx.lifeTurn('明天下午三点修改论文摘要，45分钟');
+  assert.equal(JSON.parse(requests[0].options.body).proposalId, undefined);
 });

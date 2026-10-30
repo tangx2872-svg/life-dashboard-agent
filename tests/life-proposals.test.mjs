@@ -64,3 +64,18 @@ test('Context: FAST sends a smaller slice than PLANNER',()=>{
   assert.equal(planner.preferences.customNote.length,50);
   assert.ok(fast.relevantConversation.length<=2);
 });
+
+test('Clarification: answering a question forces a plan instead of asking again',async()=>{
+  const f=fixture();let calls=0;
+  const ai={propose_life:async(text,context,previous,extra={})=>{calls++;return {proposal:calls===1?clarification('准备玩几天？'):calls===2?clarification('想要什么路线？'):planReply(3),timings:{},provider:'mock'}}};
+  const service=createLifeProposalService({store:f.store,ai,memory:{read:async()=>[]},userId:'A'});
+  const first=await service.turn({message:'春节去四川玩，帮我规划一下'});
+  assert.equal(first.intent,'clarify');
+  assert.ok(first.proposalId);
+  const second=await service.turn({message:'准备玩 5 天，预算中等',proposalId:first.proposalId});
+  assert.equal(second.intent,'plan');
+  assert.equal(second.operations.length,3);
+  assert.equal(calls,3);
+  assert.deepEqual(second.proposalId,first.proposalId,'revision keeps the same proposal id');
+  assert.equal(second.proposalVersion,2);
+});

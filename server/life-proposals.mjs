@@ -58,7 +58,7 @@ if(!p||typeof p.message!=='string'||!['plan','modify','answer','needs_clarificat
 }
 export function createLifeProposalService({store,ai,memory,userId,snapshotStore=null}){const sessions=new Map();let undo=null;const snapshots=new Map(),inflight=new Map();return {
  async turn(packet){const message=String(packet.message||'').trim();if(!message||message.length>4000)fail('请输入想安排的事情');const state=await store.read(),previous=packet.proposalId?sessions.get(packet.proposalId):null;if(packet.proposalId&&!previous)throw new HttpError(404,'方案已失效，请重新整理');if(previous&&previous.baseRevision!==state.revision)throw new HttpError(409,'数据已有更新，请重新生成');const started=performance.now();let rows=[];try{rows=await memory.read(userId)}catch{}const tier=chooseTier({message,scope:packet.scope,currentProjectId:packet.currentProjectId,currentTaskId:packet.currentTaskId});const context=buildLifeContext(state,message,{...packet,memories:rows,history:previous?.history||[],tier});const contextMs=performance.now()-started;const aiStarted=performance.now();let result=await ai.propose_life(message,context,previous?.proposal||null,{tier}),p=result.proposal;validateLifeProposal(p);
-      if(tier!=='PLANNER'&&shouldForcePlan(message,p)){
+      const answeredPrevious=previous?.proposal?.intent==='needs_clarification';if((tier!=='PLANNER'&&shouldForcePlan(message,p))||(answeredPrevious&&p.intent==='needs_clarification')){
         const forced=await ai.propose_life(message,context,previous?.proposal||null,{tier,forcePlan:true}).catch(()=>null);
         let replaced=false;
         if(forced&&forced.proposal){try{validateLifeProposal(forced.proposal);result=forced;p=forced.proposal;replaced=true}catch{replaced=false}}
