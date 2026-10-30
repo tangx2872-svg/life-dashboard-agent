@@ -68,7 +68,7 @@ export function createApp(store,options={}) {
         if(!packet||typeof packet!=='object'||Array.isArray(packet))throw new HttpError(400,'请求格式错误');
         const action=url.pathname.split('/').at(-1);return send(200,await activeAssistant[action](packet));
       }
-      if(req.method==='GET'&&url.pathname==='/api/state')return send(200,{...await activeStore.read(),csrf:activeCsrf});
+      if(req.method==='GET'&&url.pathname==='/api/state')return send(200,{...await activeStore.read(),csrf:activeCsrf,supportsLifeProposals:!!scoped.lifeProposals});
       if(req.method==='PUT'&&url.pathname==='/api/state'){
         if(req.headers['x-dashboard-token']!==activeCsrf)throw new HttpError(403,'请刷新页面后再保存');
         if(!req.headers['content-type']?.startsWith('application/json'))throw new HttpError(415,'需要 JSON');

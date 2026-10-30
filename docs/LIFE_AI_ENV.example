@@ -1,0 +1,8 @@
+# Copy these server-only settings into ai-backend/.env as needed.
+# Leave empty to preserve the existing AutoDL-compatible model configuration.
+OPENAI_API_KEY=
+OPENAI_MODEL=
+OPENAI_BASE_URL=
+LIFE_FAST_MODEL=
+LIFE_PLANNER_MODEL=
+LIFE_REASONING_EFFORT=low

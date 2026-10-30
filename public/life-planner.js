@@ -123,12 +123,12 @@ async function lifeTranscribe(){
   if(!lifeAudio.blob)return;
   life.phase='transcribing';life.error='';lifeRefresh();
   try{
-    const result=await productAPI.transcribe(lifeAudio.blob);
+    const voiceStarted=performance.now();const result=await productAPI.transcribe(lifeAudio.blob);life.voiceTimings={asr_ms:performance.now()-voiceStarted,...result.timings};
     lifeAudio.blob=null;
     const transcript=(result.transcript||'').trim();
-    if(!transcript)throw Error('没听清，再说一次。');
+    if(!transcript)throw Error('没听清，再说一次。');lifeAudio.blob=null;
     const input=document.getElementById('life-input');if(input)input.value=transcript;
-    await lifeTurn(transcript);
+    life.phase='idle';await lifeTurn(transcript);
   }catch(e){life.error=e.message||'没转成文字，可以直接打字。';life.phase='error';lifeRefresh()}
 }
 function lifeFocusComposer(){nav('home');setTimeout(()=>{const input=document.getElementById('life-input');if(input){input.focus();input.scrollIntoView({block:'center'})}},60)}
