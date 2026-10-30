@@ -30,13 +30,22 @@ ai-backend/.venv/bin/python -m pip install -r ai-backend/requirements.txt
 
 ## 数据库与业务配置
 
-新库由管理员参考 docs/mysql-setup.sql 创建，替换示例密码。应用账号需要该库 SELECT/INSERT/UPDATE/DELETE/CREATE 权限；表在启动时自动创建，现有数据保持。已有服务器数据库先备份，再更新代码，不能 DROP/重建业务库。全新服务器不会自动包含本机 legacy_owner 和私人数据。
+新库由管理员参考 docs/mysql-setup.sql 创建，替换示例密码。已有服务器数据库先备份，再更新代码，不能 DROP/重建业务库。全新服务器不会自动包含本机 legacy_owner 和私人数据。
+
+权限分两类，实测缺一不可：
+
+- 初始化必需（首次启动建表）：`CREATE`。核心表（users / user_states / user_sessions / user_snapshots / user_requests / user_activity / auth_migrations / dashboard_state / dashboard_snapshots / dashboard_requests）由 Node 首次启动自动 `CREATE TABLE IF NOT EXISTS`。
+- 长期保留：`SELECT, INSERT, UPDATE, DELETE`，以及 `ALTER, INDEX, REFERENCES`。`user_sessions` 等表带外键，只给前四项会在建表时报 `ER_TABLEACCESS_DENIED_ERROR`，`life-web` 直接启动失败；兼容性加列需要 `ALTER`。不授予 `DROP / GRANT OPTION / FILE / SUPER`。
+
+另有 3 张表 Node 启动时**不会**自动创建，必须用管理员账号先建好，否则长期记忆、记忆观察器、AI 快照缓存会 503（`life-web` 日志出现 `agent_observer ok:false`）：`agent_memory`、`agent_observations`、`ai_snapshot_cache`，建表语句见 docs/mysql-setup.sql。初始化完成后可用 `SHOW TABLES` 对照，正常应为 13 张表。
 
 创建 /opt/life/.env（权限 600，属于 life），以下所有 CHANGE_ME 都须替换：
 
 ```dotenv
 NODE_ENV=production
 PORT=3000
+# 生产必需：必须与公网访问使用的协议+域名完全一致，否则启动即失败/请求被 403
+PUBLIC_ORIGIN=https://life.example.com
 MYSQL_HOST=127.0.0.1
 MYSQL_PORT=3306
 MYSQL_USER=life_dashboard
@@ -47,6 +56,8 @@ AI_BACKEND_TIMEOUT_S=90
 ```
 
 NODE_ENV=production 开启 Secure session cookie，因此公网必须 HTTPS。Node 源码固定监听 loopback；Nginx 与服务放在同一主机即可，不需要把 Node 改成公网监听。当前提案/Undo 等部分上下文在进程内，先用单个 Node 实例，禁止未经验证的多实例轮询。
+
+`PUBLIC_ORIGIN` 不是可选装饰：`server/account-gateway.mjs` 在 `NODE_ENV=production` 下要求它存在且以 `https://` 开头，否则进程直接抛 `Production requires HTTPS PUBLIC_ORIGIN` 退出；它同时用于 `server/index.mjs` 的 Host 白名单和所有 `/api/*` 的 Origin 校验。用 IP 访问、自签证书或改域名后忘记同步它，都会表现为“服务 active 但页面 403 / 登录不成功”。更换域名时必须同时改 `PUBLIC_ORIGIN` 和 Nginx `server_name`，再 `systemctl restart life-web`。
 
 ## AI 配置
 
@@ -147,13 +158,37 @@ location / {
 
 所有 /api/ 仍转发给 Node，不能把它直接转给 Python。无需静态 alias 指向构建目录，Node 自带 public/ 服务。hash 路由 /#/today 不需要独立服务端路径。不要公开 Python 的 /docs 或其未经账户网关保护的接口，不要公开 MySQL/3000/6016 端口；公网仅开放所需 HTTPS/HTTP 和管理入口。麦克风需要 HTTPS。
 
+公网 443 不通时按顺序分层排查，不要只凭超时下结论：
+
+1. 监听：`ss -lntp | grep :443` 应显示 nginx 监听，`curl -k https://127.0.0.1/ -H 'Host: <域名>'` 应返回 200（证明 Nginx 与证书本身正常）。
+2. 主机防火墙：`ufw status`、`iptables -S`（云厂商常注入类似 `YJ-FIREWALL-INPUT` 的链，注意其中是否有非 22 端口的 REJECT）。
+3. 云平台安全组 / 云防火墙：`80` 可通而 `443` 超时是最典型的“安全组未放通 443”特征。
+4. 外部实测：用第三方节点（例如 check-host.net 的 TCP 检查）从境外/多地域连接，避免只在本机回环验证。
+5. 抓包定位：在检查期间 `tcpdump -ni eth0 'tcp dst port 443 and tcp[tcpflags] & tcp-syn != 0'`，若外部 SYN 完全没有到达主机，说明阻塞在上游（安全组/云防火墙），而不是 Nginx 或主机 iptables。
+
+证书签发用服务器已有方式（如 certbot）：`certbot --nginx -d <域名>`，随后 `nginx -t && systemctl reload nginx`（不要直接 restart 中断旧站）。签发完成后必须从公网真实访问验证，本机自签证书通过不代表公网 HTTPS 可用。
+
+## 备份、保留与清理（2026-10-30 起服务器已配置）
+
+服务器上已有可复用的实现，路径与周期如下，脚本均为 root 700，产物 600，日志不含密钥：
+
+- 每日 03:30 `life-backup.service`（`/usr/local/sbin/life-backup.sh`）：`mysqldump --single-transaction --routines --triggers` + gzip + sha256，输出到 `/var/backups/life-dashboard/`。保留最近 14 天每日备份，每月 1 日的备份额外保留 180 天，日志 `/var/log/life-backup.log`。
+- 每周日 04:30 `life-restore-check.service`（`/usr/local/sbin/life-restore-check.sh`）：校验 sha256，把最新备份恢复到独立临时库 `life_restore_check`，比对表数与用户数后删除临时库，**从不触碰生产库**。这是“备份可用”的唯一证据，新增功能后应重跑。
+- 每日 04:00 `life-audio-cleanup.service`（`/usr/local/sbin/life-audio-cleanup.sh 7`）：上传音频只用于转写、不参与业务查询，保留 7 天排障后删除；日志 `/var/log/life-ai-cleanup.log`。
+- 异机副本：服务器上**尚未配置**。放一个可执行脚本 `/etc/life/backup-offsite.sh`（参数为备份文件绝对路径，可用 rclone/BOS/rsync 上传）后，每日备份会自动调用；未配置时日志会明确记录“未配置异机副本”。仅本地备份无法抵御整机丢失，上线前必须补齐。
+- 恢复演练与真实恢复的区别：演练只做“备份能还原出完整结构+行数”，真正的灾难恢复要先停止 `life-web/ai`，确认不会用旧备份覆盖期间新写入的数据，再导入生产库并重启。
+- 旧站数据库 `django_lms` 的备份不在这套定时任务内，需要在改动旧站前单独 `mysqldump` 留档。
+
 ## 数据迁移、验收和回滚
 
 - 只部署代码不会搬运本机数据库、密码或 legacy_owner。单用户内容可用账户导出/导入；需要保留全部账户/密码哈希/session/记忆时，对完整数据库做受保护备份并恢复到专用新库，不能只迁移 dashboard_state。不要上传 .local/mysql-data，不要在聊天或 Git 中传备份。
 - 现有 legacy-owner.mjs 等迁移脚本保留，只在确有旧数据认领需求时按其说明本地交互使用，不在空库盲跑。升级前记录原 commit 并做可恢复数据库备份。
-- 验收：游客进入/刷新；正式邮箱注册自动登录/刷新；退出重登；创建项目任务并刷新；游客新增内容合并（系统 Demo 不并入）；AI 追问选项→计划→确认→Undo；原文编辑重试；HTTPS 麦克风转写自动规划；手机无溢出；不同账户数据隔离。
+- 验收必须区分两级结论，不能混为一谈：
+  - “服务启动成功”：systemd active、`/health` 200、`/api/ai/health` 可达、首页 200。这只证明进程和端口通。
+  - “产品验收成功”：游客进入/刷新；正式邮箱注册自动登录/刷新；退出重登；创建项目任务并刷新；游客新增内容合并（系统 Demo 不并入）；真实 AI 追问→计划→确认→Undo；原文编辑重试；真实语音（HTTPS 麦克风或真实音频文件）转写并自动规划；手机无溢出；不同账户数据隔离（A 写真实项目/任务/记忆后，B 的列表、详情、导出、记忆搜索均读不到）。未实测的项必须标注“未验证”，不能用 mock 或 `/health` 代替。
+- `/health` 成功、上游 `GET /api/v1/models` 返回 401 都只证明“网络可达 + 服务在跑”，**不能**证明模型名可用、流式与 strict json_schema 可用。真实 AI 验收必须发起一次带真实密钥的生成请求，并检查返回结构与页面表现。
 - curl http://127.0.0.1:6016/health 和 http://127.0.0.1:3000/api/ai/health 检查连通；公开 HTTPS 上检查注册、session Cookie Secure 和真实模型请求。AI 故障不能影响手动 CRUD。
-- 更新用 git fetch origin + git pull --ff-only origin main，检查本地改动，安装依赖/构建后重启两个服务。不要 force、reset 清理未知修改。回滚到已记录的版本时先停止服务并评估数据库兼容性，不能自动回滚业务数据覆盖新写入。
+- 更新用 git fetch origin + git pull --ff-only origin main，检查本地改动，安装依赖/构建后重启两个服务。不要 force、reset 清理未知修改。回滚时先停止服务、评估数据库兼容性，并且**默认保留服务器本地改动与配置**：先 `git status`、`git stash push -u -m pre-rollback`（或复制受影响的配置文件），再切换到目标 commit 的普通 `git checkout <commit>` / `git revert`；只有确认工作区没有未知改动且不需要保留时，才考虑 `reset --hard`，且绝不能回滚数据库覆盖部署期间的新写入。
 - 本机测试需要 .local/mysql-local.json 独立测试库，生产不要为了跑 npm test 去初始化/重建正式 MySQL。CI/开发环境完成这些测试，生产做上述受控验收。
 
 交接时请服务器 AI 回报：实际 commit、域名、两个服务状态、MySQL 连接、HTTPS/session、AI/ASR 实测结果、备份位置与回滚办法。尚缺域名/IP/SSH 与真实密钥，不能声称已完成服务器部署。
