@@ -91,6 +91,15 @@ LIFE_REASONING_EFFORT=low
 
 将 /var/lib/life-ai 及子目录创建并授予 life 用户写权限。用真实 API 请求验证模型名称、网络出口及 Responses 流式 + strict json_schema 支持，/health 成功不代表模型调用成功。不要把 mock 当作生产语音服务。若需改用其它模型配置，参考 docs/LIFE_AI_ENV.example 和 ai-backend/.env.example；不要只改首页文案冒充配置成功。
 
+单一 AutoDL Key 可同时用于 `AUTODL_LLM_BASE_URL`（Bearer）和 `GEMINI_BASE_URL`（`x-goog-api-key`）两个上游；2026-10-30 实测 `/api/v1/models` 返回 200 且列表中含 `gpt-5.6-luna`，Gemini 侧 `generateContent` 也返回 200。配置 Key 后只需 `systemctl restart life-ai`，Node 不必重启。
+
+### 已知限制（2026-10-30 真实环境实测）
+
+- 延迟抖动大：同一句规划请求实测 6.8s / 8.4s / 10.6s / 31s / 35s / 42s / 54s，也出现过 **>90s**。`AI_BACKEND_TIMEOUT_S=90` 到点返回 504，前端 `public/agent-interaction.js` 里的 `AbortSignal.timeout(90000)` 也会直接显示 `signal timed out`。要根治需要同时上调 Node 超时与该前端常量（属代码改动），或换更快模型；仅调 Nginx 180s 无效。
+- 计划预览不逐条列出：前端 preview 读取 `plan.stages`，而 `/api/planner/turn` 目前返回 `operations + summary`（`plan` 为 null），所以卡片只有摘要与可调整建议，没有逐条任务清单；确认仍严格按 `operations` 执行。
+- 撤销是“进程内批次”：`changeBatchId` 只保存在当前页面会话，刷新后撤销按钮消失（符合单实例设计）。`/api/life/undo` 接口本身在未刷新时可正常回滚。
+- 追问可能多轮：信息不足时会连续追问（实测 1~3 轮），每轮都是真实模型调用；提交追问答案时必须带上上一轮的 `proposalId`，否则会重新开始而反复追问。
+
 ## systemd 示例
 
 /etc/systemd/system/life-ai.service（先用实际路径确认 python 存在）：
