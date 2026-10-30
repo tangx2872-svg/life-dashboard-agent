@@ -97,7 +97,8 @@ class LifeLLMService:
         if body.forcePlan:instructions+='当前输入信息足够，请采用合理默认值直接输出plan，不得追问，questions=[]。'
         started=time.perf_counter();first=None;chunks=[];completed=False
         effort=os.getenv('LIFE_'+tier+'_REASONING_EFFORT') or ('medium' if tier=='PLANNER' else 'low')
-        extra={'reasoning':{'effort':effort}} if model.startswith(('gpt-5','gpt-6')) else {}
+        supports_reasoning=model.lower().startswith(('gpt-5','gpt-6')) or 'glm' in model.lower()
+        extra={'reasoning':{'effort':effort}} if supports_reasoning else {}
         payload={'text':body.text,'context':body.context,'previous':body.previous}
         stream=await self.client.responses.create(**extra,model=model,instructions=instructions,input=json.dumps(payload,ensure_ascii=False),text={'format':{'type':'json_schema','name':'life_proposal','schema':LifeProposal.model_json_schema(),'strict':True}},max_output_tokens=7000 if tier=='PLANNER' else 2500,stream=True)
         async for event in stream:

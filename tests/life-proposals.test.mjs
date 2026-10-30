@@ -41,6 +41,8 @@ test('Tier: simple single requests stay FAST, global re-planning goes PLANNER',(
   assert.equal(chooseTier({message:'明天下午三点修改论文摘要45分钟，晚上七点健身一个小时'}),'FAST');
   assert.equal(chooseTier({message:'这个延期到周五上午十点，改成60分钟',currentTaskId:'task1'}),'FAST');
   assert.equal(chooseTier({message:'重新把这个任务延期到周五'}),'FAST');
+  assert.equal(chooseTier({message:'下周一提醒我提交课程作业'}),'FAST');
+  assert.equal(chooseTier({message:'这周把论文改完'}),'PLANNER');
   assert.equal(chooseTier({message:'帮我重新安排下周论文、六级和健身，每天别太满'}),'PLANNER');
   assert.equal(chooseTier({message:'看看今天安排',scope:'global'}),'PLANNER');
 });
