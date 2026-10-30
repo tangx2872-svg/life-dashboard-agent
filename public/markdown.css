@@ -1,0 +1,58 @@
+/* Safe Markdown output for AI text (see markdown.js). Uses product.css design tokens. */
+.markdown-body{font-size:15px;line-height:1.75;color:inherit;overflow-wrap:anywhere}
+.markdown-body>:first-child{margin-top:0}
+.markdown-body>:last-child{margin-bottom:0}
+.markdown-body h1,.markdown-body h2{font-size:clamp(22px,5vw,28px);line-height:1.32;letter-spacing:-.02em;font-weight:600;margin:24px 0 12px}
+.markdown-body h3{font-size:17px;line-height:1.4;font-weight:600;margin:22px 0 10px}
+.markdown-body h4,.markdown-body h5,.markdown-body h6{font-size:15px;font-weight:600;margin:18px 0 8px}
+.markdown-body p{margin:0 0 14px;line-height:1.75}
+.markdown-body strong{font-weight:600}
+.markdown-body del{opacity:.65}
+.markdown-body ul,.markdown-body ol{margin:0 0 14px;padding-left:1.35em}
+.markdown-body li{margin:6px 0;line-height:1.7}
+.markdown-body li::marker{color:var(--muted,#738079)}
+.markdown-body blockquote{margin:16px 0;padding:2px 0 2px 14px;border-left:2px solid var(--accent,#396552);color:var(--muted,#738079)}
+.markdown-body blockquote p:last-child{margin-bottom:0}
+.markdown-body code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.92em;padding:2px 5px;border-radius:5px;background:rgba(57,101,82,.08)}
+.markdown-body pre{margin:0 0 16px;padding:12px 14px;border-radius:10px;background:rgba(37,56,49,.05);overflow-x:auto}
+.markdown-body pre code{padding:0;background:none;font-size:13px;line-height:1.6}
+.markdown-body a{color:var(--accent,#396552);text-decoration:underline;text-underline-offset:2px}
+.markdown-body hr{margin:22px 0;border:0;border-top:1px solid var(--line,#e3e8e3)}
+.markdown-body .md-table-wrap{margin:6px 0 18px;overflow-x:auto;scrollbar-width:thin}
+.markdown-body table{width:100%;border-collapse:collapse;font-size:14px}
+.markdown-body th,.markdown-body td{text-align:left;vertical-align:top;padding:10px 12px;border-bottom:1px solid var(--line,#e3e8e3)}
+.markdown-body th{font-size:13px;font-weight:600;color:var(--muted,#738079);white-space:nowrap}
+.markdown-body tbody tr:last-child td{border-bottom:0}
+/* Weekly review: day cards instead of a wide table. */
+.week-plan{margin:18px 0 6px}
+.week-plan-summary{margin:0 0 4px;font-size:15px;line-height:1.65;color:var(--muted,#738079)}
+.week-plan-range{margin:0 0 18px;font-size:13px;letter-spacing:.02em;color:var(--muted,#738079)}
+.week-plan-days{list-style:none;margin:0;padding:0}
+.week-plan-day{padding:16px 0;border-bottom:1px solid var(--line,#e3e8e3)}
+.week-plan-day:first-child{padding-top:0}
+.week-plan-day:last-child{border-bottom:0;padding-bottom:0}
+.week-plan-date{display:flex;align-items:baseline;gap:8px;margin-bottom:8px}
+.week-plan-date strong{font-size:17px;font-weight:600;letter-spacing:-.01em;color:var(--ink,#253831)}
+.week-plan-date span{font-size:12px;color:var(--muted,#738079)}
+.week-plan-items{list-style:none;margin:0;padding:0}
+.week-plan-items li{position:relative;margin:5px 0;padding-left:14px;font-size:15px;line-height:1.7}
+.week-plan-items li::before{content:"";position:absolute;left:0;top:.72em;width:4px;height:4px;border-radius:50%;background:var(--accent,#396552);opacity:.55}
+.week-plan-empty{margin:0;font-size:14px;color:var(--muted,#738079)}
+.week-plan-extra{margin-top:20px;font-size:14px}
+.week-plan-extra h2,.week-plan-extra h3,.week-plan-extra h4{font-size:14px;font-weight:600;margin:0 0 8px;color:var(--ink,#253831)}
+.week-plan-extra p{margin:0 0 10px}
+#life-snapshot h2{font-size:clamp(26px,5.6vw,31px);line-height:1.25;letter-spacing:-.03em}
+#life-snapshot .note-content{white-space:pre-wrap}
+@media(max-width:600px){
+  .markdown-body{font-size:14px}
+  .markdown-body .md-table-wrap{overflow:visible}
+  .markdown-body table,.markdown-body thead,.markdown-body tbody,.markdown-body tr,.markdown-body th,.markdown-body td{display:block;width:100%}
+  .markdown-body thead{display:none}
+  .markdown-body tr{padding:12px 0;border-bottom:1px solid var(--line,#e3e8e3)}
+  .markdown-body tbody tr:last-child{border-bottom:0}
+  .markdown-body td{padding:2px 0;border:0}
+  .markdown-body td[data-label]:not([data-label=""])::before{content:attr(data-label);display:block;margin-bottom:2px;font-size:12px;color:var(--muted,#738079)}
+  .week-plan-date strong{font-size:16px}
+  .week-plan-items li{font-size:14px}
+  #life-snapshot h2{font-size:26px}
+}

@@ -35,7 +35,7 @@ function lifeResult(){
     :life.phase==='done'
     ?`<button class="primary" onclick="lifeDismiss()">好的</button><button onclick="nav('plans')">查看计划</button>`
     :`<button class="primary" onclick="lifeDismiss()">知道了</button>`;
-  return `<section class="result-panel" role="status"><p class="result-msg">${esc(r.message)}</p>${preview}${changes}<div class="row-actions">${actions}</div></section>`;
+  return `<section class="result-panel" role="status"><div class="result-msg markdown-body">${renderMarkdown(r.message)}</div>${preview}${changes}<div class="row-actions">${actions}</div></section>`;
 }
 function lifeTodayBlock(){
   const rows=lifeTodayTasks();
