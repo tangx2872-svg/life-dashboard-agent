@@ -47,8 +47,8 @@ test('Preview: operations drive the plan card, not plan.stages', () => {
   assert.match(html, /约 60 分钟/);
   assert.match(html, /旧任务标题/);
   assert.match(html, /工业视觉论文/);
-  assert.match(html, /新增任务/);
-  assert.match(html, /调整时间/);
+  assert.equal((html.match(/工业视觉论文/g) || []).length, 1, 'project name is shown once');
+  assert.doesNotMatch(html, /新增任务|调整时间|新建项目|修改项目|状态：|plan-op/);
   assert.match(html, /提前到上午/);
   assert.doesNotMatch(html, /旧协议阶段/);
   assert.doesNotMatch(html, /create_task|reschedule_task|clientRef|projectId/);
@@ -99,4 +99,25 @@ test('Preview: exact time is shown when the operation carries one', () => {
   assert.match(html, /11 月 2 日 · 15:00/);
   assert.match(html, /11 月 6 日 · 周五/);
   assert.doesNotMatch(html, /undefined/);
+});
+
+test('Preview: one compact card per revision', () => {
+  const html = harness({
+    intent: 'plan', summary: '嘉兴单日游，暂不指定具体景点',
+    understanding: '你想把嘉兴游改为单日往返，默认安排在周六10月31日，不指定景点与具体时刻。',
+    message: '看看这样安排', questions: [],
+    adjustments: ['保留原出行意图，取消11月1日行程', '可补充交通方式与预算', '可指定想去的景点', '可改回两天'],
+    warnings: ['10月31日已有“更新简历”任务，可能与出行冲突。'],
+    operations: [
+      operation('create_project', {title: '嘉兴单日游', clientRef: 'c1'}),
+      operation('create_task', {title: '嘉兴游玩', projectId: 'c1', date: '2026-10-31', minutes: 600})
+    ]
+  }).lifeResult();
+  assert.match(html, /嘉兴单日游/);
+  assert.match(html, /当天已有“更新简历”，可能冲突/);
+  assert.match(html, /全天/);
+  assert.equal((html.match(/class="chip"/g) || []).length, 3, 'at most three suggestions');
+  assert.doesNotMatch(html, /保留原出行意图/, 'applied change is not a suggestion');
+  assert.equal((html.match(/class="plan-card"/g) || []).length, 1);
+  assert.doesNotMatch(html, /状态：|新增任务|新建项目/);
 });

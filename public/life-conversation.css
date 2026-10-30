@@ -41,3 +41,8 @@
   .turn-edit{position:relative;top:-2px}
   .thread-recovery{padding:12px}
 }
+
+/* The plan lives in one card below the transcript and is replaced in place. */
+.thread-plan{margin-top:14px;padding-top:6px;border-top:1px solid var(--line,#edf1e8)}
+.thread-plan .plan-card{margin:10px 0 2px}
+@media(max-width:390px){.thread-plan{margin-top:12px}}

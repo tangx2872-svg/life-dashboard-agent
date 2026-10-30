@@ -9,22 +9,21 @@ function interactionReset(){agentInteraction.controller?.abort();agentInteractio
 function interactionPick(button){const question=(life.result.questions||[]).find(q=>q.id===button.dataset.question);if(!question)return;agentInteraction.answers[question.id]=button.dataset.answer;button.parentElement.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));const next=button.closest('.clarification-card').querySelector('[data-continue]');if(next)next.disabled=(life.result.questions||[]).some(q=>!agentInteraction.answers[q.id])}
 function interactionCustom(input){agentInteraction.answers[input.dataset.question]=input.value;const next=input.closest('.clarification-card').querySelector('[data-continue]');next.disabled=(life.result.questions||[]).some(q=>!agentInteraction.answers[q.id])}
 function interactionContinue(){const questions=life.result.questions||[];if(questions.some(q=>!agentInteraction.answers[q.id]))return;const text=questions.map(q=>q.question+'：'+agentInteraction.answers[q.id]).join('；');return lifeTurn(text)}
-const interactionActionLabel={create_task:'新增任务',reschedule_task:'调整时间',update_task:'修改任务',create_project:'新建项目',update_project:'修改项目'};
 const interactionTasks=()=>typeof data!=='undefined'&&Array.isArray(data&&data.tasks)?data.tasks:[];
 const interactionProjects=()=>typeof data!=='undefined'&&Array.isArray(data&&data.projects)?data.projects:[];
 function interactionWhen(date,time){if(!date)return '';const parts=String(date).split('-');if(parts.length<3)return String(date);const head=`${Number(parts[1])} 月 ${Number(parts[2])} 日`;return time?`${head} · ${time}`:`${head} · ${lifeWeekday(date)}`}
 function interactionMinutes(op){const value=op?.minutes??op?.estimatedMinutes??op?.durationMinutes;return Number.isFinite(value)&&value>0?Math.round(value):null}
+function interactionDuration(minutes){return minutes>=600?'全天':`约 ${minutes} 分钟`}
 // operations are the only source of truth for the plan preview.
 function interactionPlanRows(r){
   const created=new Map(),rows=[];
   for(const op of r.operations||[]){
     if(!op||typeof op.action!=='string')continue;
-    const label=interactionActionLabel[op.action]||'调整';
     if(op.action==='create_project'||op.action==='update_project'){
       const known=op.action==='update_project'?interactionProjects().find(p=>p.id===op.targetId):null;
       const title=op.title||known?.title||'项目';
       if(op.clientRef)created.set(op.clientRef,title);
-      rows.push({label,title,when:op.date?interactionWhen(op.date):'',minutes:null,note:op.status?`状态：${op.status}`:''});
+      rows.push({kind:'project',title,when:op.date?interactionWhen(op.date):'',minutes:null,project:''});
       continue
     }
     const task=interactionTasks().find(t=>t.id===op.targetId);
@@ -32,12 +31,69 @@ function interactionPlanRows(r){
     const project=created.get(projectId)||interactionProjects().find(p=>p.id===projectId)?.title||'';
     const date=op.date||(op.action==='create_task'?'':task?.scheduledDate||task?.dueDate||task?.date||'');
     const time=op.time||(op.action==='create_task'?'':task?.time||'');
-    rows.push({label,title:op.title||task?.title||'任务',when:interactionWhen(date,time),minutes:interactionMinutes(op),note:project});
+    rows.push({kind:'task',title:op.title||task?.title||'任务',when:interactionWhen(date,time),minutes:interactionMinutes(op),project});
   }
   return rows
 }
-const interactionResult=lifeResult;lifeResult=function(){const r=life.result;if(!r||['idle','thinking','listening','transcribing'].includes(life.phase))return '';if(life.phase==='clarifying'){const questions=(r.questions||[]).slice(0,3);return `<section class="clarification-card"><h2>Life 想确认一下</h2><p>${esc(r.understanding||r.message)}</p>${questions.map(q=>`<div class="clarification-question"><h3>${esc(q.question)}</h3><div class="clarification-options">${q.options.map(o=>`<button type="button" data-question="${esc(q.id)}" data-answer="${esc(o.label)}" aria-pressed="false" onclick="interactionPick(this)">${esc(o.label)}</button>`).join('')}</div>${q.allowCustom?`<label class="clarification-custom">也可以自己说<input aria-label="${esc(q.question)} 自定义回答" data-question="${esc(q.id)}" oninput="interactionCustom(this)"></label>`:''}</div>`).join('')}${questions.length?'<button type="button" class="primary" data-continue disabled onclick="interactionContinue()">继续安排</button>':'<button type="button" onclick="interactionEdit()">补充一下</button>'}</section>`}if(life.phase==='review'){const rows=interactionPlanRows(r),count=(r.operations||[]).length;const list=rows.length?`<ul class="plan-rows">${rows.map(row=>`<li>${row.when?`<span class="plan-when">${esc(row.when)}</span>`:''}<strong>${esc(row.title)}</strong>${row.minutes?`<small class="plan-duration">约 ${row.minutes} 分钟</small>`:''}${row.note?`<span class="plan-note">${esc(row.note)}</span>`:''}<span class="plan-op">${esc(row.label)}</span></li>`).join('')}</ul>`:`<p class="quiet">这次没有需要改动的安排。</p>`;return `<section class="interaction-plan"><h2>我准备这样安排</h2><p class="plan-understanding">${esc(r.understanding||r.summary||r.message)}</p>${list}${(r.warnings||[]).map(w=>`<p class="quiet">${esc(w)}</p>`).join('')}${(r.adjustments||[]).length?`<div class="plan-adjust"><span>还可以</span><div class="clarification-options">${(r.adjustments||[]).slice(0,4).map(a=>`<button type="button" onclick="lifeTurn(this.textContent)">${esc(a)}</button>`).join('')}</div></div>`:''}<div class="row-actions"><button class="primary" onclick="lifeApply(life.result.operations)" ${!count||agentInteraction.dirty?'disabled':''}>确认安排</button><button onclick="interactionEdit()">继续调整</button><button class="link" onclick="interactionReset()">重新来</button></div></section>`}
-return interactionResult()};
+const PLAN_BRIEF_MAX=42;
+function interactionClip(text,max){const value=String(text||'').replace(/\s+/g,' ').trim();return value.length>max?value.slice(0,max-1)+'…':value}
+function interactionBrief(reply){return interactionClip(reply.summary||reply.understanding||reply.message||'',PLAN_BRIEF_MAX)}
+function interactionShortWarning(warning){
+  return String(warning||'')
+    .replace(/^\s*\d{1,2}\s*月\s*\d{1,2}\s*日已有/,'当天已有')
+    .replace(/任务[，,]/,'，')
+    .replace(/[，,]?\s*可能与[^，。]*冲突。?$/,'，可能冲突')
+    .replace(/[。.]$/,'')
+    .trim()
+}
+// Suggestions must describe what the user can still do, never the change just applied.
+function interactionAdjustments(reply,adjusted){
+  const norm=value=>String(value||'').replace(/[\s，。、；：""''（）()!?！？]/g,'');
+  const applied=norm(adjusted),rows=[];
+  for(const item of reply.adjustments||[]){
+    const text=String(item||'').trim();if(!text)continue;
+    const key=norm(text);
+    if(applied&&(key.includes(applied)||applied.includes(key)))continue;
+    if(/^(保留原|保持原|沿用原)/.test(text))continue;
+    if(/^(取消|删除|移除)/.test(text)&&/\d{1,2}\s*月|\d{1,2}\s*日|周[一二三四五六日天]/.test(text))continue;
+    if(rows.includes(text))continue;
+    rows.push(text);
+    if(rows.length===3)break;
+  }
+  return rows
+}
+// Single card, current version only: title, one-line brief, rows, one warning, <=3 chips.
+function interactionPlanCard(reply,options={}){
+  const r=reply||{},opts=options||{},rows=interactionPlanRows(r),count=(r.operations||[]).length;
+  const tasks=rows.filter(row=>row.kind==='task'),projectRow=rows.find(row=>row.kind==='project');
+  const uniqueProjects=[...new Set(tasks.map(row=>row.project).filter(Boolean))];
+  const brief=interactionBrief(r);
+  const title=projectRow?.title||(tasks.length===1?tasks[0].title:'')||brief||'这次安排';
+  const adjusted=opts.adjusted?`<p class="plan-adjusted">已调整：${esc(interactionClip(opts.adjusted,30))}</p>`:'';
+  const briefLine=brief&&brief!==title?`<p class="plan-brief">${esc(brief)}</p>`:'';
+  const projectLine=uniqueProjects.length===1&&uniqueProjects[0]!==title?`<p class="plan-project">${esc(uniqueProjects[0])}</p>`:'';
+  const rowHtml=row=>`<li>${row.when?`<span class="plan-when">${esc(row.when)}</span>`:''}<strong>${esc(row.title)}</strong>${row.minutes?`<small class="plan-duration">${interactionDuration(row.minutes)}</small>`:''}${uniqueProjects.length>1&&row.project&&row.project!==title?`<span class="plan-note">${esc(row.project)}</span>`:''}</li>`;
+  let list='';
+  if(!count)list='<p class="quiet">这次没有需要改动的安排。</p>';
+  else if(tasks.length>1)list=`<ul class="plan-rows">${tasks.map(rowHtml).join('')}</ul>`;
+  else if(tasks.length===1){const row=tasks[0];list=`<div class="plan-single">${row.title!==title?`<strong>${esc(row.title)}</strong>`:''}${row.when?`<span class="plan-when">${esc(row.when)}</span>`:''}${row.minutes?`<small class="plan-duration">${interactionDuration(row.minutes)}</small>`:''}</div>`}
+  else if(projectRow?.when)list=`<p class="plan-single"><span class="plan-when">${esc(projectRow.when)}</span></p>`;
+  const warning=(r.warnings||[]).filter(Boolean)[0];
+  const warningLine=warning?`<p class="plan-warning">⚠ ${esc(interactionShortWarning(warning))}</p>`:'';
+  const chips=interactionAdjustments(r,opts.adjusted);
+  const chipLine=chips.length?`<div class="plan-adjust"><span>还可以</span><div class="clarification-options">${chips.map(item=>`<button type="button" class="chip" onclick="${opts.mode==='conv'?'lifeConvAsk':'lifeTurn'}(this.textContent)">${esc(item)}</button>`).join('')}</div></div>`:'';
+  const confirm=opts.mode==='conv'?'onclick="lifeConvConfirm()"':'onclick="lifeApply(life.result.operations)"';
+  const adjust=opts.mode==='conv'?'onclick="lifeConvAdjust()"':'onclick="interactionEdit()"';
+  const disabled=!count||opts.confirmed||opts.busy;
+  const actions=opts.confirmed
+    ?`<p class="plan-saved">✓ 已保存${opts.undo||''}</p>`
+    :`<div class="row-actions plan-actions"><button class="primary" ${confirm} ${disabled?'disabled':''}>确认安排</button><button ${adjust}>继续调整</button></div>`;
+  const inline=opts.inline?`<div class="plan-inline"><textarea id="plan-inline-input" rows="2" maxlength="2000" placeholder="还有哪里想改？" aria-label="继续调整方案" onkeydown="if(event.key==='Enter'&&(event.ctrlKey||event.metaKey)&&!event.isComposing){event.preventDefault();lifeConvInlineSend()}"></textarea><div class="row-actions"><button class="primary" onclick="lifeConvInlineSend()">更新方案</button><button class="link" onclick="lifeVoice()">用语音说</button><button class="link" onclick="lifeConvInlineCancel()">取消</button></div></div>`:'';
+  const history=(opts.history||[]).filter(Boolean);
+  const historyLine=history.length?`<details class="plan-history"><summary>查看修改历史</summary><ol>${history.map(item=>`<li><span>${item.version?`v${esc(item.version)}`:'上一版'}</span>${esc(interactionClip(item.summary||'上一版方案',40))}</li>`).join('')}</ol></details>`:'';
+  return `<section class="plan-card" aria-label="当前方案"><p class="plan-heading">我准备这样安排</p>${adjusted}<h2 class="plan-title">${esc(title)}</h2>${projectLine}${briefLine}${list}${warningLine}${chipLine}${actions}${inline}${historyLine}</section>`
+}
+const interactionResult=lifeResult;lifeResult=function(){const r=life.result;if(!r||['idle','thinking','listening','transcribing'].includes(life.phase))return '';if(life.phase==='clarifying'){const questions=(r.questions||[]).slice(0,3);return `<section class="clarification-card"><h2>Life 想确认一下</h2><p>${esc(r.understanding||r.message)}</p>${questions.map(q=>`<div class="clarification-question"><h3>${esc(q.question)}</h3><div class="clarification-options">${q.options.map(o=>`<button type="button" data-question="${esc(q.id)}" data-answer="${esc(o.label)}" aria-pressed="false" onclick="interactionPick(this)">${esc(o.label)}</button>`).join('')}</div>${q.allowCustom?`<label class="clarification-custom">也可以自己说<input aria-label="${esc(q.question)} 自定义回答" data-question="${esc(q.id)}" oninput="interactionCustom(this)"></label>`:''}</div>`).join('')}${questions.length?'<button type="button" class="primary" data-continue disabled onclick="interactionContinue()">继续安排</button>':'<button type="button" onclick="interactionEdit()">补充一下</button>'}</section>`}if(life.phase==='review')return interactionPlanCard(r,{busy:agentInteraction.dirty});return ''};
 const interactionComposer=lifeComposer;lifeComposer=function(){return interactionComposer().replace(/disabled oninput="lifeDraftInput/g,'oninput="lifeDraftInput')};
 const interactionPhase=lifePhaseText;lifePhaseText=function(){if(life.phase==='idle')return '';if(agentInteraction.dirty)return '内容已修改，重新整理后再确认。';if(life.phase==='thinking')return '我在整理你的想法…';if(life.phase==='clarifying'||life.phase==='review')return '';return interactionPhase()};
 render();

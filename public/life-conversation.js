@@ -1,6 +1,6 @@
-// One continuous planning conversation: every utterance, question and answer stays visible.
-// Structured turns are the source of truth; the textarea only holds the current draft.
-const lifeConvState={turns:[],draft:'',editing:null,custom:'',request:0,controller:null,state:'idle',error:'',errorKind:'',tech:'',proposalId:null,version:0};
+// One continuous planning conversation: utterances and questions stay visible,
+// while the plan itself is a single card that is replaced in place on every revision.
+const lifeConvState={turns:[],draft:'',editing:null,custom:'',request:0,controller:null,state:'idle',error:'',errorKind:'',tech:'',proposalId:null,version:0,current:null,inline:false,pendingAdjust:''};
 const LIFE_CONV_PLACEHOLDER='继续说，或者直接讲下一步…';
 function lifeConvId(){return 't'+Math.random().toString(36).slice(2,9)}
 function lifeConvDraft(){const input=document.getElementById('life-input');return input?input.value:(lifeConvState.draft||'')}
@@ -24,20 +24,14 @@ function lifeConvQuestionHtml(turn,q){
   const custom=q.allowCustom!==false;
   return `<div class="turn-question"><p class="turn-ask">${esc(q.question)}</p><div class="clarification-options">${(q.options||[]).map(o=>`<button type="button" class="chip" onclick="lifeConvPick('${turn.id}','${esc(q.id)}','${esc(o.label)}')">${esc(o.label)}</button>`).join('')}${custom?`<button type="button" class="chip chip-quiet" onclick="lifeConvCustom('${turn.id}','${esc(q.id)}','open')">自己填写</button>`:''}</div>${custom?`<div class="turn-custom" ${open?'':'hidden'}><input id="${inputId}" placeholder="用自己的话说" aria-label="${esc(q.question)}" onkeydown="if(event.key==='Enter'&&!event.isComposing){event.preventDefault();lifeConvCustom('${turn.id}','${esc(q.id)}','send',this.value)}"><button type="button" onclick="lifeConvCustom('${turn.id}','${esc(q.id)}','send',document.getElementById('${inputId}').value)">就这个</button></div>`:''}</div>`;
 }
-function lifeConvPlanRows(reply){
-  if(typeof interactionPlanRows==='function')return interactionPlanRows(reply);
-  return (reply.operations||[]).map(o=>({label:'调整',title:o.title||'任务',when:o.date?lifeDayLabel(o.date):'',minutes:o.minutes||null,note:''}));
-}
-function lifeConvProposalHtml(turn){
-  const reply=turn.reply||{},rows=lifeConvPlanRows(reply),count=(reply.operations||[]).length;
-  const list=rows.length?`<ul class="plan-rows">${rows.map(row=>`<li>${row.when?`<span class="plan-when">${esc(row.when)}</span>`:''}<strong>${esc(row.title)}</strong>${row.minutes?`<small class="plan-duration">约 ${row.minutes} 分钟</small>`:''}${row.note?`<span class="plan-note">${esc(row.note)}</span>`:''}<span class="plan-op">${esc(row.label)}</span></li>`).join('')}</ul>`:`<p class="quiet">这次没有需要写入的改动。</p>`;
+function lifeConvCurrentHtml(){
+  const cur=lifeConvState.current;if(!cur)return '';
   const undo=typeof lifeCoreBatch!=='undefined'&&lifeCoreBatch?'：<button class="link" onclick="lifeCoreUndo()">撤销这次安排</button>':'';
-  return `<h3 class="turn-title">我准备这样安排</h3><div class="markdown-body plan-understanding">${renderMarkdown(reply.understanding||reply.summary||reply.message||'')}</div>${list}${(reply.warnings||[]).map(w=>`<p class="quiet">${esc(w)}</p>`).join('')}${(reply.adjustments||[]).length?`<div class="plan-adjust"><span>还可以</span><div class="clarification-options">${reply.adjustments.slice(0,4).map(a=>`<button type="button" class="chip" onclick="lifeConvAsk(this.textContent)">${esc(a)}</button>`).join('')}</div></div>`:''}<div class="row-actions"><button class="primary" onclick="lifeConvConfirm('${turn.id}')" ${!count||turn.confirmed||life.phase==='applying'?'disabled':''}>${turn.confirmed?'已经安排':'确认安排'}</button>${turn.confirmed?'':`<button onclick="lifeConvFocus()">继续调整</button>`}</div>${turn.confirmed?`<p class="turn-answer">✓ 已保存${undo}</p>`:''}`;
+  return `<div class="thread-plan">${interactionPlanCard(cur.reply,{mode:'conv',confirmed:cur.confirmed,adjusted:cur.adjusted,history:cur.history,inline:lifeConvState.inline,busy:life.phase==='applying',undo})}</div>`
 }
 function lifeConvTurnHtml(turn){
   if(turn.role==='user')return `<li class="turn turn-user" data-turn="${turn.id}"><div class="turn-body"><p class="turn-text">${esc(turn.text)}</p><small class="turn-meta">${turn.source==='voice'?'语音':'打字'}</small></div>${turn.editable===false?'':`<button type="button" class="turn-edit" onclick="lifeConvEdit('${turn.id}')" aria-label="修改这句话">改一下</button>`}</li>`;
   if(turn.type==='clarification')return `<li class="turn turn-assistant" data-turn="${turn.id}"><div class="turn-body">${turn.understanding?`<p class="turn-understanding">${esc(turn.understanding)}</p>`:''}${(turn.questions||[]).length?turn.questions.map(q=>lifeConvQuestionHtml(turn,q)).join(''):`<p class="turn-ask">${esc(turn.prompt||'可以再补充一句更具体的信息。')}</p>`}</div></li>`;
-  if(turn.type==='proposal')return `<li class="turn turn-assistant turn-plan" data-turn="${turn.id}"><div class="turn-body">${lifeConvProposalHtml(turn)}</div></li>`;
   return `<li class="turn turn-assistant" data-turn="${turn.id}"><div class="turn-body markdown-body">${renderMarkdown(turn.reply?.message||turn.text||'')}</div></li>`;
 }
 function lifeConvStatusHtml(){
@@ -57,10 +51,11 @@ function lifeConvStatusHtml(){
   return '';
 }
 function lifeThreadHtml(){
-  const status=lifeConvStatusHtml();
-  if(!lifeConvState.turns.length&&!status)return '';
+  const status=lifeConvStatusHtml(),plan=lifeConvCurrentHtml();
+  if(!lifeConvState.turns.length&&!status&&!plan)return '';
   const head=`<div class="thread-head"><span>这次安排</span><button type="button" class="link" onclick="lifeConvReset()">新对话</button></div>`;
-  return `<section class="life-thread" aria-label="这次安排的对话记录">${head}<ol class="thread-turns">${lifeConvState.turns.map(lifeConvTurnHtml).join('')}</ol>${status}</section>`;
+  const turns=lifeConvState.turns.length?`<ol class="thread-turns">${lifeConvState.turns.map(lifeConvTurnHtml).join('')}</ol>`:'';
+  return `<section class="life-thread" aria-label="这次安排的对话记录">${head}${turns}${plan}${status}</section>`;
 }
 // --- flow ---------------------------------------------------------------
 function lifeConvFocus(){const input=document.getElementById('life-input');if(!input)return setTimeout(lifeConvFocus,80);input.focus();input.scrollIntoView({block:'center',behavior:'smooth'})}
@@ -71,14 +66,23 @@ function lifeConvAccept(reply){
     const questions=(reply.questions||[]).map(q=>({id:String(q.id||lifeConvId()),question:q.question,options:Array.isArray(q.options)?q.options:[],allowCustom:q.allowCustom!==false,answer:''}));
     lifeConvPush({role:'assistant',type:'clarification',reply,proposalId:reply.proposalId||lifeConvState.proposalId,understanding:questions.length?(reply.understanding||reply.message):'',prompt:questions.length?'':reply.message,questions});
     lifeConvState.proposalId=reply.proposalId||lifeConvState.proposalId;
-    lifeConvState.state='clarifying';life.phase='clarifying';
+    lifeConvState.state='clarifying';life.phase='clarifying';lifeConvState.inline=false;
   }else if((reply.operations||[]).length){
-    lifeConvPush({role:'assistant',type:'proposal',reply,proposalId:reply.proposalId,confirmed:false});
+    // Replace the single visible plan instead of appending another full card.
+    const previous=lifeConvState.current;
+    lifeConvState.current={
+      reply,
+      proposalId:reply.proposalId||lifeConvState.proposalId,
+      confirmed:false,
+      adjusted:previous?(lifeConvState.pendingAdjust||''):'',
+      history:previous?[...(previous.history||[]),{version:previous.reply?.proposalVersion||lifeConvState.version,summary:previous.reply?.summary||previous.reply?.understanding||''}]:[]
+    };
+    lifeConvState.pendingAdjust='';
     lifeConvState.proposalId=reply.proposalId||lifeConvState.proposalId;lifeConvState.version=reply.proposalVersion||0;
-    lifeConvState.state='proposal_ready';life.phase='review';
+    lifeConvState.state='proposal_ready';life.phase='review';lifeConvState.inline=false;
   }else{
     lifeConvPush({role:'assistant',type:'answer',reply,text:reply.message});
-    lifeConvState.state='done';life.phase='answered';
+    lifeConvState.state='done';life.phase='answered';lifeConvState.inline=false;
   }
   lifeConvState.error='';lifeConvState.errorKind='';
 }
@@ -109,9 +113,10 @@ async function lifeConvSend({text,proposalId,mode='first'}){
 function lifeConvSubmit(text,source='text'){
   const message=String(text||'').trim();if(!message)return;
   if(['thinking','transcribing','applying'].includes(life.phase))return;
+  if(lifeConvState.current)lifeConvState.pendingAdjust=message;
   const pending=lifeConvPending();
   if(lifeConvState.editing){
-    lifeConvState.editing=null;lifeConvState.proposalId=null;
+    lifeConvState.editing=null;lifeConvState.proposalId=null;lifeConvState.current=null;lifeConvState.inline=false;
     lifeConvPush({role:'user',type:'utterance',text:message,source});
     lifeConvState.draft='';
     return lifeConvSend({text:message});
@@ -150,6 +155,20 @@ function lifeConvAnswer(turn){
   return lifeConvSend({text:questions.map(q=>`${q.question}：${q.answer}`).join('；'),proposalId:turn.proposalId||lifeConvState.proposalId});
 }
 function lifeConvAsk(text){lifeConvSubmit(text,'text')}
+function lifeConvAdjust(){
+  if(life.phase==='applying')return;
+  lifeConvState.inline=!lifeConvState.inline;
+  lifeRefresh();
+  if(lifeConvState.inline)setTimeout(()=>document.getElementById('plan-inline-input')?.focus(),60);
+}
+function lifeConvInlineCancel(){lifeConvState.inline=false;lifeRefresh()}
+function lifeConvInlineSend(){
+  const input=document.getElementById('plan-inline-input');
+  const text=String(input?.value||'').trim();
+  if(!text)return input?.focus();
+  lifeConvState.inline=false;
+  return lifeConvSubmit(text,'text');
+}
 function lifeConvRetry(){
   const last=lifeConvLastUser();if(!last)return lifeConvFocus();
   // Retry the same words without adding a second copy to the transcript.
@@ -169,22 +188,25 @@ function lifeConvEdit(turnId){
   const turn=lifeConvState.turns[index];
   lifeConvState.controller?.abort();lifeConvState.request++;
   lifeConvState.turns.splice(index);lifeConvState.proposalId=null;lifeConvState.version=0;
+  lifeConvState.current=null;lifeConvState.inline=false;lifeConvState.pendingAdjust='';
   lifeConvState.draft=turn.text;lifeConvState.state='idle';life.phase='idle';life.result=null;life.error='';
   lifeRefresh();setTimeout(()=>{const input=document.getElementById('life-input');if(input){input.focus();input.setSelectionRange(input.value.length,input.value.length)}},40);
 }
-async function lifeConvConfirm(turnId){
-  const turn=lifeConvState.turns.find(t=>t.id===turnId);if(!turn||turn.confirmed||life.phase==='applying')return;
-  if(!turn.reply?.proposalId)return toast('这个方案已经失效，重新整理一次吧。');
-  life.result=turn.reply;lifeConvState.state='applying';lifeRefresh();
+async function lifeConvConfirm(){
+  const cur=lifeConvState.current;
+  if(!cur||cur.confirmed||life.phase==='applying')return;
+  if(!cur.reply?.proposalId)return toast('这个方案已经失效，重新整理一次吧。');
+  agentInteraction.dirty=false;
+  life.result=cur.reply;lifeConvState.state='applying';lifeRefresh();
   try{
-    await lifeApply(turn.reply.operations);
-    if(life.phase==='done'){turn.confirmed=true;lifeConvState.state='done';lifeConvPush({role:'assistant',type:'answer',reply:{message:'已经按这个方案安排好了。'}})}
+    await lifeApply(cur.reply.operations);
+    if(life.phase==='done'){cur.confirmed=true;lifeConvState.state='done';lifeConvPush({role:'assistant',type:'answer',reply:{message:'已经按这个方案安排好了。'}})}
   }catch(e){lifeConvState.state='error';lifeConvState.error='没能保存，数据没有改动。';lifeConvState.tech=e?.message||''}
   lifeRefresh();
 }
 function lifeConvReset(){
   lifeConvState.controller?.abort();lifeConvState.request++;
-  Object.assign(lifeConvState,{turns:[],draft:'',editing:null,custom:'',state:'idle',error:'',errorKind:'',tech:'',proposalId:null,version:0});
+  Object.assign(lifeConvState,{turns:[],draft:'',editing:null,custom:'',state:'idle',error:'',errorKind:'',tech:'',proposalId:null,version:0,current:null,inline:false,pendingAdjust:''});
   life.result=null;life.phase='idle';life.error='';life.text='';lifeRefresh();
   setTimeout(lifeConvFocus,60);
 }
@@ -197,7 +219,7 @@ if(typeof lifeTurn==='function'){
     const keep=life.text;life.text=lifeConvState.draft||'';
     let html;
     try{html=lifeConvBaseComposer()}finally{life.text=keep}
-    if(lifeConvState.turns.length)html=html.replace('跟我说说最近要做什么……比如：这周把论文改完，周六想休息',LIFE_CONV_PLACEHOLDER);
+    if(lifeConvState.turns.length||lifeConvState.current)html=html.replace('跟我说说最近要做什么……比如：这周把论文改完，周六想休息',LIFE_CONV_PLACEHOLDER);
     const thread=lifeThreadHtml();
     return thread?html.replace('<div class="composer',thread+'<div class="composer'):html;
   };
