@@ -9,7 +9,7 @@ class Responses:
         assert kwargs['text']['format']['strict'] is True
         assert 'operations' in kwargs['text']['format']['schema']['properties']
         async def events():
-            yield SimpleNamespace(type='response.output_text.delta',delta=json.dumps({'summary':'test','intent':'answer','message':'已理解','operations':[],'warnings':[]}))
+            yield SimpleNamespace(type='response.output_text.delta',delta=json.dumps({'summary':'test','intent':'answer','message':'已理解','operations':[],'warnings':[],'understanding':'已理解','questions':[],'adjustments':[]}))
             if self.complete:yield SimpleNamespace(type='response.completed')
         return events()
 def test_structured_stream_validated_only_after_complete():

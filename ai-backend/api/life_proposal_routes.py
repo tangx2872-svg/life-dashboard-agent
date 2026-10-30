@@ -17,6 +17,17 @@ class LifeOperation(BaseModel):
     priority: Literal['high','normal','low']|None
     description: str|None
     status: Literal['未开始','进行中','暂停','已完成']|None
+class ClarificationOption(BaseModel):
+    model_config=ConfigDict(extra='forbid')
+    label: str
+    value: str
+class ClarificationQuestion(BaseModel):
+    model_config=ConfigDict(extra='forbid')
+    id: str
+    question: str
+    type: Literal['single_choice']
+    options: list[ClarificationOption]
+    allowCustom: bool
 class LifeProposal(BaseModel):
     model_config=ConfigDict(extra='forbid')
     summary: str
@@ -24,6 +35,9 @@ class LifeProposal(BaseModel):
     message: str
     operations: list[LifeOperation]
     warnings: list[str]
+    understanding: str
+    questions: list[ClarificationQuestion]
+    adjustments: list[str]
 class LifeRequest(BaseModel):
     model_config=ConfigDict(extra='forbid')
     text: str=Field(min_length=1,max_length=4000)
@@ -44,7 +58,8 @@ class LifeLLMService:
         tier='PLANNER' if len(body.text)>80 or any(w in body.text for w in ['这周','下周','重新','所有','未来','模拟']) else 'FAST'
         model=os.getenv('LIFE_'+tier+'_MODEL') or self.model
         if not model: raise ValueError('Planning model not configured')
-        instructions=('你是Life个人助理的大脑。仅返回受控结构化提案，不执行操作。当前时间在context中。'
+        instructions=('你是Life规划与生活安排助理。用户说了无行动目的的片段时，询问要安排什么事情；不要主动引导续写或润色文章。你是Life个人助理的大脑。仅返回受控结构化提案，不执行操作。当前时间在context中。'
+         '信息不足时最多问1至3个高影响问题，questions给出2至5个简短选项并allowCustom=true；不要先生成操作。信息足够时questions=[]，不无意义追问。周末短途可按两天等低风险默认值，并说明假设。understanding简述当前理解。计划完成时adjustments给出2至4个适用的简短修改建议，追问时为空数组。根据页面上下文或历史已知的内容不要再问。'
          '准确使用已有项目与任务ID；不确定对象时needs_clarification并operations=[]，不要猜ID。'
          '创建项目用clientRef标识，新增任务可用该clientRef作为projectId。优先复用已有项目。'
          '输入包含currentProject/currentTask时，“这个”指它。全局重排参考整体日程，局部请求不要修改无关项目。'

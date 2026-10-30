@@ -123,13 +123,11 @@ async function lifeTranscribe(){
   if(!lifeAudio.blob)return;
   life.phase='transcribing';life.error='';lifeRefresh();
   try{
-    const voiceStarted=performance.now();const result=await productAPI.transcribe(lifeAudio.blob);life.voiceTimings={asr_ms:performance.now()-voiceStarted,...result.timings};
-    lifeAudio.blob=null;
+    const originalDraft=life.text||'';const voiceStarted=performance.now();const result=await productAPI.transcribe(lifeAudio.blob);life.voiceTimings={asr_ms:performance.now()-voiceStarted,...result.timings};
     const transcript=(result.transcript||'').trim();
     if(!transcript)throw Error('没听清，再说一次。');lifeAudio.blob=null;
-    const input=document.getElementById('life-input');if(input)input.value=transcript;
-    life.phase='idle';await lifeTurn(transcript);
-  }catch(e){life.error=e.message||'没转成文字，可以直接打字。';life.phase='error';lifeRefresh()}
+    life.text=originalDraft.trim()?originalDraft.replace(/\s+$/,'')+( /[。！？.!?]$/.test(originalDraft.trim())?'':'。')+'\n'+transcript:transcript;life.phase='idle';lifeRefresh();await lifeTurn(life.text);
+  }catch(e){life.error='刚才没听清，可以再说一次，或重试转写。';life.phase='error';lifeRefresh()}
 }
 function lifeFocusComposer(){nav('home');setTimeout(()=>{const input=document.getElementById('life-input');if(input){input.focus();input.scrollIntoView({block:'center'})}},60)}
 function lifeAskAbout(title,id=''){life.focus=id?{id,title}:{title};nav('home');setTimeout(()=>lifeTurn('这个接下来怎么安排？'),0)}

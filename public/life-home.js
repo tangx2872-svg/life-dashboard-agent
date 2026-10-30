@@ -16,18 +16,14 @@ function lifeGreeting(){const h=new Date().getHours();return h<6?'还没睡？':
 function lifeHome(){
   return lifeComposer()+lifeResult()+lifeTodayBlock()+lifePlansBlock()+lifeAdviceBlock();
 }
+function lifeResizeInput(input){input.style.height='auto';input.style.height=Math.min(input.scrollHeight,240)+'px';const send=input.closest('.composer')?.querySelector('[data-life-submit]');if(send)send.disabled=!input.value.trim()||['thinking','transcribing','listening'].includes(life.phase)}
+function lifeDraftInput(input){life.text=input.value;lifeResizeInput(input)}
+function submitLifeInput(button){const composer=button?.closest('.composer')||document.getElementById('life-input')?.closest('.composer'),input=composer?.querySelector('textarea'),text=String(input?.value||'').trim();if(!text||['thinking','transcribing','listening'].includes(life.phase))return;life.text=input.value;return lifeTurn(text)}
 function lifeComposer(){
-  const busy=life.phase==='thinking'||life.phase==='transcribing';
-  return `<section class="hero">
-    <p class="hi">${lifeGreeting()}</p>
-    <h1>有什么想安排的吗？</h1>
-    <div class="composer ${life.phase==='listening'?'is-recording':''}">
-      <textarea id="life-input" rows="2" maxlength="1000" aria-label="想做的事" placeholder="跟我说说最近要做什么……比如：这周把论文改完，周六想休息" ${busy?'disabled':''} onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();lifeTurn(this.value)}"></textarea>
-      <button class="mic ${life.phase==='listening'?'is-recording':''}" id="life-mic" onclick="lifeVoice()" aria-label="${life.phase==='listening'?'结束录音':'语音输入'}" ${busy?'disabled':''}>${life.phase==='listening'?'■':'🎙'}</button>
-    </div>
-    <p class="phase ${life.phase==='error'?'is-error':''}" role="status">${esc(lifePhaseText())}${life.phase==='listening'?' <span id="life-mic-time">00:00</span>':''}</p>
-  </section>`;
+ const busy=life.phase==='thinking'||life.phase==='transcribing',recording=life.phase==='listening';
+ return `<section class="hero"><p class="hi">${lifeGreeting()}</p><h1>有什么想安排的吗？</h1><div class="composer ${recording?'is-recording':''}"><textarea id="life-input" rows="3" maxlength="4000" aria-label="想做的事" placeholder="跟我说说最近要做什么……比如：这周把论文改完，周六想休息" ${busy?'disabled':''} oninput="lifeDraftInput(this)" onkeydown="if(event.key==='Enter'&&(event.ctrlKey||event.metaKey)&&!event.isComposing){event.preventDefault();submitLifeInput(this.closest('.composer').querySelector('[data-life-submit]'))}"></textarea><div class="life-composer-actions"><button type="button" class="mic ${recording?'is-recording':''}" id="life-mic" onclick="lifeVoice()" aria-label="${recording?'结束录音':'语音输入'}" ${busy?'disabled':''}>${recording?'■':'🎙'}</button><button type="button" data-life-submit class="primary" aria-label="让 Life 帮我安排" onclick="submitLifeInput(this)" ${busy||recording||!life.text?.trim()?'disabled':''}>${life.phase==='thinking'?'正在整理…':'帮我安排'}</button></div></div><p class="phase ${life.phase==='error'?'is-error':''}" role="status">${esc(lifePhaseText())}${recording?' <span id="life-mic-time">00:00</span>':''}</p><small class="life-input-hint">Ctrl / ⌘ + Enter 提交，Enter 换行</small></section>`;
 }
+
 function lifeResult(){
   const r=life.result;if(!r)return '';
   if(life.phase==='idle')return '';

@@ -25,20 +25,20 @@ test('Life: one sentence becomes a plan, then Undo puts everything back',{skip:!
   assert.match(await p.locator('.hero h1').innerText(),/想安排/);
 
   await p.locator('#life-input').fill(SENTENCE);
-  await p.locator('#life-input').press('Enter');
-  await p.waitForSelector('.result-panel',{timeout:20000});
-  const message=await p.locator('.result-msg').innerText();
+  await p.locator('#life-input').press('Control+Enter');
+  await p.waitForSelector('.interaction-plan',{timeout:20000});
+  const message=await p.locator('.interaction-plan > p').innerText();
   assert.match(message,/整理好了/);
-  const steps=await p.locator('.plan-preview li').count();
+  const steps=await p.locator('.interaction-plan ol li').count();
   assert.ok(steps>=4,`应拆成多步，实际 ${steps}`);
-  const preview=await p.locator('.plan-preview').innerText();
+  const preview=(await p.locator('.interaction-plan ol').allInnerTexts()).join('\n');
   assert.ok(!preview.includes('周六'),'周六被留空');
 
   // Nothing is written before the user accepts.
   const before=(await f.store.read()).data;
   assert.equal(before.projects.filter(x=>x.source==='planner').length,0);
 
-  await p.getByRole('button',{name:'就这样',exact:true}).click();
+  await p.getByRole('button',{name:'确认安排',exact:true}).click();
   await p.waitForSelector('.undo-bar',{timeout:20000});
   const after=(await f.store.read()).data;
   const created=after.projects.filter(x=>x.source==='planner');
