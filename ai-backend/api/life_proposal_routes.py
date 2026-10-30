@@ -1,9 +1,11 @@
 from typing import Literal
 import json, os, re, time
+from uuid import uuid4
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from openai import AsyncOpenAI
 from api.routes import _autodl_llm
+from services.llm.router import LifeModelRouter
 router=APIRouter()
 class LifeOperation(BaseModel):
     model_config=ConfigDict(extra='forbid')
@@ -94,12 +96,10 @@ class LifeLLMService:
         if len(text)>120:return 'PLANNER'
         if any(w in text for w in ('所有','全部','整体','重新安排','重排','重新规划','这周','本周','下周','未来','每天','每周','多项目','冲突','太满','太紧')):return 'PLANNER'
         return 'FAST'
-    async def _run(self,model,instructions,payload,tier,force_plan=False):
+    async def _run(self,target,instructions,payload,tier):
         started=time.perf_counter();first=None;chunks=[];completed=False
-        effort=os.getenv('LIFE_'+tier+'_REASONING_EFFORT') or ('medium' if tier=='PLANNER' else 'low')
-        supports_reasoning=model.lower().startswith(('gpt-5','gpt-6')) or 'glm' in model.lower()
-        extra={'reasoning':{'effort':effort}} if supports_reasoning else {}
-        stream=await self.client.responses.create(**extra,model=model,instructions=instructions,input=json.dumps(payload,ensure_ascii=False),text={'format':{'type':'json_schema','name':'life_proposal','schema':LifeProposal.model_json_schema(),'strict':True}},max_output_tokens=7000 if tier=='PLANNER' else 2500,stream=True)
+        extra={'reasoning':{'effort':target.effort}} if target.supports_reasoning else {}
+        stream=await self.client.responses.create(**extra,model=target.model,instructions=instructions,input=json.dumps(payload,ensure_ascii=False),text={'format':{'type':'json_schema','name':'life_proposal','schema':LifeProposal.model_json_schema(),'strict':True}},max_output_tokens=7000 if tier=='PLANNER' else 2500,stream=True)
         async for event in stream:
             if event.type=='response.output_text.delta':
                 if first is None:first=(time.perf_counter()-started)*1000
@@ -107,39 +107,69 @@ class LifeLLMService:
             elif event.type=='response.completed':completed=True
             elif event.type in ['response.failed','response.incomplete','error']:raise ValueError('Incomplete model response')
         if not completed:raise ValueError('Interrupted model stream')
-        return ''.join(chunks),first,started
-    async def propose(self,body):
-        tier=body.tier if body.tier in ('FAST','PLANNER') else self._tier(body.text)
-        model=os.getenv('LIFE_'+tier+'_MODEL') or self.model
-        if not model:raise ValueError('Planning model not configured')
-        instructions=(FAST_INSTRUCTIONS if tier=='FAST' else PLANNER_INSTRUCTIONS)
-        if body.forcePlan:instructions+=PLAN_NOW_RULE
-        payload={'text':body.text,'context':body.context,'previous':body.previous}
-        started=time.perf_counter();first=None;text='';repair=False;reason=''
+        return ''.join(chunks),first
+    async def _attempt(self,target,instructions,payload,tier):
+        repair=False
+        text,first=await self._run(target,instructions,payload,tier)
         try:
-            text,first,_=await self._run(model,instructions,payload,tier)
             proposal=LifeProposal.model_validate_json(text)
-        except Exception as error:
-            # One repair attempt: same model, explicit "schema only" instruction, no extra spend on a different provider.
-            repair=True;reason=type(error).__name__
-            repaired=instructions+SCHEMA_REPAIR_RULE
-            text,first_fix,_=await self._run(model,repaired,payload,tier,True)
-            first=first or first_fix
+        except Exception:
+            # One repair attempt on the same model with an explicit "schema only" instruction.
+            repair=True
+            text,fixed=await self._run(target,instructions+SCHEMA_REPAIR_RULE,payload,tier)
+            first=first or fixed
             proposal=LifeProposal.model_validate_json(text)
         # A question styled as intent=answer leaves the user without choices: retry once as a real clarification.
         if proposal.intent=='answer' and not proposal.operations and _ASKS_BACK.search(proposal.message or ''):
             try:
-                text,first_fix,_=await self._run(model,instructions+CLARIFY_REPAIR_RULE,payload,tier)
+                text,fixed=await self._run(target,instructions+CLARIFY_REPAIR_RULE,payload,tier)
                 repaired=LifeProposal.model_validate_json(text)
-                if repaired.intent!='answer':proposal=repaired;repair=True;reason='clarify_as_answer'
-                first=first or first_fix
-            except Exception:pass
+                if repaired.intent!='answer':proposal=repaired;repair=True
+                first=first or fixed
+            except Exception:
+                pass
         if len(proposal.operations)>60:raise ValueError('Too many actions')
-        llm_ms=(time.perf_counter()-started)*1000
-        timings={'first_token_ms':first,'ttft_ms':first,'llm_total_ms':llm_ms,'generation_ms':round(llm_ms-(first or 0),1),'parse_ms':0.0,'total_ms':round((time.perf_counter()-started)*1000,1)}
-        if repair:timings['repair']=1
-        print(json.dumps({'event':'life_llm','tier':tier,'model':model,'provider':self.provider,'repair':repair,'repair_reason':reason,'ttft_ms':first,'total_ms':timings['total_ms']},ensure_ascii=False),flush=True)
-        return {'proposal':proposal.model_dump(),'timings':timings,'provider':self.provider,'tier':tier,'model':model,'repair':repair}
+        return proposal,first,repair
+    async def propose(self,body):
+        tier=body.tier if body.tier in ('FAST','PLANNER') else self._tier(body.text)
+        router=_router_for(self.model)
+        candidates=router.candidates(tier)
+        if not candidates:raise ValueError('Planning model not configured')
+        instructions=(FAST_INSTRUCTIONS if tier=='FAST' else PLANNER_INSTRUCTIONS)
+        if body.forcePlan:instructions+=PLAN_NOW_RULE
+        payload={'text':body.text,'context':body.context,'previous':body.previous}
+        request_id=uuid4().hex[:8];started=time.perf_counter();failures=[];last_error=None
+        for index,target in enumerate(candidates):
+            attempt_started=time.perf_counter()
+            try:
+                proposal,first,repair=await self._attempt(target,instructions,payload,tier)
+            except Exception as error:
+                reason=type(error).__name__;last_error=error
+                router.failure(target,reason)
+                failures.append({'model':target.model,'reason':reason})
+                print(json.dumps({'event':'life_llm_attempt','request_id':request_id,'tier':tier,'model':target.model,'role':target.role,'ms':round((time.perf_counter()-attempt_started)*1000,1),'ok':False,'reason':reason},ensure_ascii=False),flush=True)
+                continue
+            total=round((time.perf_counter()-attempt_started)*1000,1)
+            router.success(target,first,total)
+            llm_ms=(time.perf_counter()-started)*1000
+            timings={'first_token_ms':first,'ttft_ms':first,'llm_total_ms':llm_ms,'generation_ms':round(llm_ms-(first or 0),1),'total_ms':round((time.perf_counter()-started)*1000,1)}
+            if repair:timings['repair']=1
+            fallback=index>0
+            print(json.dumps({'event':'life_llm','request_id':request_id,'route_tier':tier,'selected_provider':target.model,'fallback_provider':target.model if fallback else None,'fallback_reason':failures[0]['reason'] if fallback and failures else None,'ttft_ms':first,'total_ms':total,'success':True,'repair':repair,'clarification_count':len(proposal.questions or []),'operations':len(proposal.operations or [])},ensure_ascii=False),flush=True)
+            return {'proposal':proposal.model_dump(),'timings':timings,'provider':target.model,'tier':tier,'repair':repair,'requestId':request_id,'fallback':fallback,'route':target.describe()}
+        print(json.dumps({'event':'life_llm','request_id':request_id,'route_tier':tier,'success':False,'fallbacks':failures},ensure_ascii=False),flush=True)
+        if last_error:raise last_error
+        raise ValueError('Planning model not configured')
+_ROUTERS={}
+def _router_for(base_model):
+    key=base_model or 'default'
+    if key not in _ROUTERS:_ROUTERS[key]=LifeModelRouter.from_env(base_model)
+    return _ROUTERS[key]
+
+@router.get('/api/life/router/status')
+async def router_status():
+    return {'routers':[router.status() for router in _ROUTERS.values()]}
+
 @router.post('/api/life/propose')
 async def propose(body:LifeRequest,request:Request):
     return await LifeLLMService(request).propose(body)
