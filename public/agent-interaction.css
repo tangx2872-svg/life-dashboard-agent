@@ -12,11 +12,15 @@ body:has(main .hero #life-input) .floating{display:none!important}
 .plan-single strong{font-weight:600}
 .plan-single .plan-when{margin:0;font-size:13px;color:#6f7d68}
 .plan-rows{padding:0;list-style:none;margin:12px 0 0}
-.plan-rows li{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;padding:10px 0;border-bottom:1px solid #edf1e8}
-.plan-rows li:last-child{border-bottom:0}
-.plan-when{min-width:132px;color:#6f7d68;font-variant-numeric:tabular-nums}
-.plan-rows strong{flex:1;min-width:140px;font-weight:600;overflow-wrap:anywhere}
-.plan-duration{color:#8a9680}
+.plan-rows>li{padding:10px 0;border-bottom:1px solid #edf1e8}
+.plan-rows>li:last-child{border-bottom:0}
+.plan-group-date{display:block;margin-bottom:4px;font-size:12px;color:#8a9680;font-variant-numeric:tabular-nums}
+.plan-group-items{list-style:none;margin:0;padding:0}
+.plan-group-items li{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;padding:2px 0}
+.plan-time{min-width:46px;color:#6f7d68;font-variant-numeric:tabular-nums}
+.plan-group-items strong{flex:1;min-width:120px;font-weight:600;overflow-wrap:anywhere}
+.plan-when{color:#6f7d68;font-variant-numeric:tabular-nums}
+.plan-duration{margin-left:4px;color:#8a9680}
 .plan-note{color:#8a9680;font-size:12px}
 .plan-warning{margin:12px 0 0;padding:9px 12px;font-size:12px;line-height:1.55;color:#8a6d3b;background:#fbf7ec;border:1px solid #efe6d2;border-radius:10px}
 .plan-adjust{margin:14px 0 0}
@@ -38,8 +42,8 @@ body:has(main .hero #life-input) .floating{display:none!important}
 }
 @media(max-width:390px){
   .plan-card{padding:14px}
-  .plan-rows li{display:block}
-  .plan-when{display:block;min-width:0;margin-bottom:2px}
+  .plan-group-items li{display:block}
+  .plan-time{display:inline-block;min-width:0;margin-right:6px}
   .plan-actions .primary{flex:1 1 100%}
   .plan-inline .row-actions button{flex:1 1 auto}
 }

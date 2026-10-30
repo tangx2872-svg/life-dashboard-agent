@@ -96,7 +96,8 @@ test('Preview: exact time is shown when the operation carries one', () => {
       operation('create_task', {title: '全文检查', projectId: 'p1', date: '2026-11-06', minutes: 45})
     ]
   }).lifeResult();
-  assert.match(html, /11 月 2 日 · 15:00/);
+  assert.match(html, /11 月 2 日 · 周一/);
+  assert.match(html, /15:00/);
   assert.match(html, /11 月 6 日 · 周五/);
   assert.doesNotMatch(html, /undefined/);
 });

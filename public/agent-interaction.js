@@ -31,7 +31,7 @@ function interactionPlanRows(r){
     const project=created.get(projectId)||interactionProjects().find(p=>p.id===projectId)?.title||'';
     const date=op.date||(op.action==='create_task'?'':task?.scheduledDate||task?.dueDate||task?.date||'');
     const time=op.time||(op.action==='create_task'?'':task?.time||'');
-    rows.push({kind:'task',title:op.title||task?.title||'任务',when:interactionWhen(date,time),minutes:interactionMinutes(op),project});
+    rows.push({kind:'task',title:op.title||task?.title||'任务',when:interactionWhen(date,time),date:date||'',time:time||'',minutes:interactionMinutes(op),project});
   }
   return rows
 }
@@ -72,11 +72,19 @@ function interactionPlanCard(reply,options={}){
   const adjusted=opts.adjusted?`<p class="plan-adjusted">已调整：${esc(interactionClip(opts.adjusted,30))}</p>`:'';
   const briefLine=brief&&brief!==title?`<p class="plan-brief">${esc(brief)}</p>`:'';
   const projectLine=uniqueProjects.length===1&&uniqueProjects[0]!==title?`<p class="plan-project">${esc(uniqueProjects[0])}</p>`:'';
-  const rowHtml=row=>`<li>${row.when?`<span class="plan-when">${esc(row.when)}</span>`:''}<strong>${esc(row.title)}</strong>${row.minutes?`<small class="plan-duration">${interactionDuration(row.minutes)}</small>`:''}${uniqueProjects.length>1&&row.project&&row.project!==title?`<span class="plan-note">${esc(row.project)}</span>`:''}</li>`;
   let list='';
   if(!count)list='<p class="quiet">这次没有需要改动的安排。</p>';
-  else if(tasks.length>1)list=`<ul class="plan-rows">${tasks.map(rowHtml).join('')}</ul>`;
-  else if(tasks.length===1){const row=tasks[0];list=`<div class="plan-single">${row.title!==title?`<strong>${esc(row.title)}</strong>`:''}${row.when?`<span class="plan-when">${esc(row.when)}</span>`:''}${row.minutes?`<small class="plan-duration">${interactionDuration(row.minutes)}</small>`:''}</div>`}
+  else if(tasks.length>1){
+    // Same-day tasks share one date heading instead of repeating the date on every row.
+    const groups=new Map();
+    for(const row of tasks){const key=row.date||row.when||'';if(!groups.has(key))groups.set(key,[]);groups.get(key).push(row)}
+    list=`<ul class="plan-rows">${[...groups].map(([key,items])=>{
+      const first=items[0],heading=first.date?interactionWhen(first.date):(first.when||'');
+      const rows=items.map(row=>`<li>${row.time?`<span class="plan-time">${esc(row.time)}</span>`:''}<strong>${esc(row.title)}</strong>${row.minutes?`<small class="plan-duration">${interactionDuration(row.minutes)}</small>`:''}${uniqueProjects.length>1&&row.project&&row.project!==title?`<span class="plan-note">${esc(row.project)}</span>`:''}</li>`).join('');
+      return `<li class="plan-group">${heading?`<span class="plan-group-date">${esc(heading)}</span>`:''}<ul class="plan-group-items">${rows}</ul></li>`
+    }).join('')}</ul>`
+  }
+  else if(tasks.length===1){const row=tasks[0],whenDate=String(row.when||'').split(' · ')[0],showWhen=row.when&&!(brief&&whenDate&&brief.includes(whenDate));list=`<div class="plan-single">${row.title!==title?`<strong>${esc(row.title)}</strong>`:''}${showWhen?`<span class="plan-when">${esc(row.when)}</span>`:''}${row.minutes?`<small class="plan-duration">${interactionDuration(row.minutes)}</small>`:''}</div>`}
   else if(projectRow?.when)list=`<p class="plan-single"><span class="plan-when">${esc(projectRow.when)}</span></p>`;
   const warning=(r.warnings||[]).filter(Boolean)[0];
   const warningLine=warning?`<p class="plan-warning">⚠ ${esc(interactionShortWarning(warning))}</p>`:'';
