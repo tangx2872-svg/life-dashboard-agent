@@ -16,7 +16,7 @@ export function chooseTier({message='',scope='home',currentProjectId='',currentT
   if(currentTaskId)return 'FAST';
   if(scope==='global')return 'PLANNER';
   if(text.length>120)return 'PLANNER';
-  const strong=/(所有|全部|整体|重新安排|重排|重新规划|下个?月|未来|每天|每周|多项目|冲突|太满|太紧)/;
+  const strong=/(所有|全部|整体|重新安排|重排|重新规划|下个?月|未来|每天|每周|多项目|冲突|太满|太紧|旅行|旅游|出去玩|出游|短途|度假|散心|行程)/;
   const week=/(这周|本周|下周)/;
   const single=/(这个|它|该任务|延期|推迟|延后|提前|挪到|改到|改成|取消|删除|去掉|提醒)/;
   if(strong.test(text))return 'PLANNER';

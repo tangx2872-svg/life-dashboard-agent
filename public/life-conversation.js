@@ -14,7 +14,7 @@ function lifeConvErrorText(e){
 }
 function lifeConvRetryable(e){
   if(e?.name==='TimeoutError')return false;
-  return ['AI_BACKEND_INVALID_RESPONSE','AI_CAPTURE_FAILED'].includes(String(e?.code||''))||/格式|不完整|解析/.test(String(e?.message||''));
+  return ['AI_BACKEND_UNAVAILABLE','AI_BACKEND_INVALID_RESPONSE','AI_CAPTURE_FAILED'].includes(String(e?.code||''))||/格式|不完整|解析|不可用/.test(String(e?.message||''));
 }
 function lifeConvPush(turn){lifeConvState.turns.push({id:lifeConvId(),...turn});return lifeConvState.turns[lifeConvState.turns.length-1]}
 // --- rendering -----------------------------------------------------------
@@ -88,7 +88,8 @@ async function lifeConvSend({text,proposalId,mode='first'}){
     lifeConvAccept(reply);
   }catch(e){
     if(request!==lifeConvState.request||controller.signal.aborted)return;
-    if(proposalId&&/失效|过期/.test(String(e.message||'')))return lifeConvSend({text,mode:'retry'});
+    // A stale/expired proposal (or server-side data change) must not block the retry: drop it and plan again.
+    if(proposalId&&/失效|过期|已有更新|重新生成|新版本/.test(String(e.message||'')))return lifeConvSend({text,mode:'retry'});
     if(mode!=='retry'&&lifeConvRetryable(e)){
       lifeConvState.state='recovering';lifeConvState.tech=e.message||'';lifeRefresh();
       await new Promise(resolve=>setTimeout(resolve,400));
@@ -142,11 +143,18 @@ function lifeConvAnswer(turn){
   return lifeConvSend({text:questions.map(q=>`${q.question}：${q.answer}`).join('；'),proposalId:turn.proposalId||lifeConvState.proposalId});
 }
 function lifeConvAsk(text){lifeConvSubmit(text,'text')}
-function lifeConvRetry(){const last=lifeConvLastUser();if(!last)return lifeConvFocus();lifeConvState.state='planning';lifeConvSubmit(last.text,last.source)}
+function lifeConvRetry(){
+  const last=lifeConvLastUser();if(!last)return lifeConvFocus();
+  // Retry the same words without adding a second copy to the transcript.
+  lifeConvState.state='planning';lifeConvState.error='';lifeConvState.tech='';
+  lifeConvState.controller?.abort();
+  return lifeConvSend({text:last.text,proposalId:lifeConvState.proposalId,mode:'retry'});
+}
 function lifeConvSaveRaw(){
-  const last=lifeConvLastUser();const text=last?.text||lifeConvDraft().trim();if(!text)return;
+  const said=lifeConvState.turns.filter(t=>t.role==='user').map(t=>t.text);
+  const text=(said.length?said.join('\n'):lifeConvDraft()).trim();if(!text)return;
   if(!window.lifeAccount?.user)return toast('登录后可以把原话保存到记录。');
-  runDatabaseCommand(()=>{simpleNewRecord(text.slice(0,60),text,'',{type:'record',source:'life-conversation'});save();toast('原话已保存到记录，之后可以接着整理。')});
+  runDatabaseCommand(()=>{simpleNewRecord(text.split('\n')[0].slice(0,60),text,'',{type:'record',source:'life-conversation'});save();toast('原话已保存到记录，之后可以接着整理。')});
   lifeConvState.state='done';lifeRefresh();
 }
 function lifeConvEdit(turnId){
