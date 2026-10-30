@@ -7,6 +7,8 @@
 
 from __future__ import annotations
 
+import os
+
 from core.config import ASR_PROVIDERS, LLM_PROVIDERS, Settings
 from core.errors import AppError, ErrorCode
 from core.logging import get_logger
@@ -16,8 +18,8 @@ from services.llm.base import LLMProvider
 logger = get_logger(__name__)
 
 
-def build_asr_provider(settings: Settings) -> ASRProvider:
-    name = settings.asr_provider
+def build_asr_provider_named(name: str, settings: Settings) -> ASRProvider:
+    name = (name or "").strip().lower()
     if name not in ASR_PROVIDERS:
         raise AppError(
             code=ErrorCode.PROVIDER_NOT_CONFIGURED,
@@ -42,6 +44,32 @@ def build_asr_provider(settings: Settings) -> ASRProvider:
     from services.asr.openai_asr import OpenAIASRProvider
 
     return OpenAIASRProvider(settings)
+
+
+def build_asr_provider(settings: Settings) -> ASRProvider:
+    return build_asr_provider_named(settings.asr_provider, settings)
+
+
+def build_asr_pool(settings: Settings) -> ASRProvider:
+    """Primary plus optional ASR_FALLBACK_1..3; unavailable extras are skipped, never fatal."""
+    from services.asr.router import ASRRouter
+
+    wanted = [os.getenv("ASR_PRIMARY") or settings.asr_provider]
+    wanted += [os.getenv(f"ASR_FALLBACK_{index}") for index in (1, 2, 3)]
+    pool: list[tuple[str, ASRProvider]] = []
+    seen: set[str] = set()
+    for candidate in wanted:
+        name = (candidate or "").strip().lower()
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        try:
+            pool.append((name, build_asr_provider_named(name, settings)))
+        except Exception as error:  # noqa: BLE001 - a missing fallback must not break startup
+            if not pool:
+                raise
+            logger.warning("跳过不可用的 ASR fallback %s: %s", name, error)
+    return ASRRouter(pool)
 
 
 def build_llm_provider(settings: Settings) -> LLMProvider:

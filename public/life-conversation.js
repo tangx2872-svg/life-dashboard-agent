@@ -1,6 +1,6 @@
 // One continuous planning conversation: every utterance, question and answer stays visible.
 // Structured turns are the source of truth; the textarea only holds the current draft.
-const lifeConvState={turns:[],draft:'',editing:null,custom:'',request:0,controller:null,state:'idle',error:'',tech:'',proposalId:null,version:0};
+const lifeConvState={turns:[],draft:'',editing:null,custom:'',request:0,controller:null,state:'idle',error:'',errorKind:'',tech:'',proposalId:null,version:0};
 const LIFE_CONV_PLACEHOLDER='继续说，或者直接讲下一步…';
 function lifeConvId(){return 't'+Math.random().toString(36).slice(2,9)}
 function lifeConvDraft(){const input=document.getElementById('life-input');return input?input.value:(lifeConvState.draft||'')}
@@ -46,7 +46,14 @@ function lifeConvStatusHtml(){
   if(life.phase==='applying')return '<p class="thread-status" role="status">正在保存你的安排…</p>';
   if(lifeConvState.state==='recovering')return '<p class="thread-status" role="status">正在换一种方式重新整理…</p>';
   if(life.phase==='thinking')return '<p class="thread-status" role="status">正在整理…</p>';
-  if(lifeConvState.state==='error')return `<div class="thread-recovery" role="alert"><p>这次整理没成功，但你的内容已经保留。</p><div class="row-actions"><button class="primary" onclick="lifeConvRetry()">重新整理</button><button onclick="lifeConvSaveRaw()">先保存原话</button><button class="link" onclick="lifeConvFocus()">继续补充</button></div><details><summary>详情</summary><p>${esc(lifeConvState.tech||lifeConvState.error)}</p></details></div>`;
+  if(lifeConvState.state==='error'){
+    const asr=lifeConvState.errorKind==='asr';
+    const actions=asr
+      ?`${lifeAudio.blob?'<button class="primary" onclick="lifeTranscribe()">重试转写</button>':''}<button onclick="lifeVoice()">重新录音</button><button class="link" onclick="lifeConvFocus()">直接打字</button>`
+      :`<button class="primary" onclick="lifeConvRetry()">重新整理</button><button onclick="lifeConvSaveRaw()">先保存原话</button><button class="link" onclick="lifeConvFocus()">继续补充</button>`;
+    const message=asr?(lifeConvState.error||'刚才没听清，可以再说一次，或重试转写。'):'这次整理没成功，但你的内容已经保留。';
+    return `<div class="thread-recovery" role="alert"><p>${esc(message)}</p><div class="row-actions">${actions}</div><details><summary>详情</summary><p>${esc(lifeConvState.tech||lifeConvState.error)}</p></details></div>`;
+  }
   return '';
 }
 function lifeThreadHtml(){
@@ -73,7 +80,7 @@ function lifeConvAccept(reply){
     lifeConvPush({role:'assistant',type:'answer',reply,text:reply.message});
     lifeConvState.state='done';life.phase='answered';
   }
-  lifeConvState.error='';
+  lifeConvState.error='';lifeConvState.errorKind='';
 }
 async function lifeConvSend({text,proposalId,mode='first'}){
   const request=++lifeConvState.request;
@@ -96,7 +103,7 @@ async function lifeConvSend({text,proposalId,mode='first'}){
       if(request!==lifeConvState.request)return;
       return lifeConvSend({text,proposalId,mode:'retry'});
     }
-    lifeConvState.state='error';life.phase='error';lifeConvState.tech=e.message||'';lifeConvState.error=lifeConvErrorText(e);
+    lifeConvState.state='error';life.phase='error';lifeConvState.errorKind='plan';lifeConvState.tech=e.message||'';lifeConvState.error=lifeConvErrorText(e);
   }finally{if(request===lifeConvState.request)lifeRefresh()}
 }
 function lifeConvSubmit(text,source='text'){
@@ -177,7 +184,7 @@ async function lifeConvConfirm(turnId){
 }
 function lifeConvReset(){
   lifeConvState.controller?.abort();lifeConvState.request++;
-  Object.assign(lifeConvState,{turns:[],draft:'',editing:null,custom:'',state:'idle',error:'',tech:'',proposalId:null,version:0});
+  Object.assign(lifeConvState,{turns:[],draft:'',editing:null,custom:'',state:'idle',error:'',errorKind:'',tech:'',proposalId:null,version:0});
   life.result=null;life.phase='idle';life.error='';life.text='';lifeRefresh();
   setTimeout(lifeConvFocus,60);
 }
@@ -220,9 +227,11 @@ if(typeof lifeTurn==='function'){
       lifeAudio.blob=null;
       const draft=lifeConvDraft().trim();
       if(draft){lifeConvState.draft=draft+'\n'+transcript;lifeConvState.state='idle';life.phase='idle';lifeRefresh();return}
+      // Leave the transcribing state before submitting, otherwise the guard drops the turn.
+      life.phase='idle';lifeConvState.state='idle';
       await lifeConvSubmit(transcript,'voice');
     }catch(e){
-      lifeConvState.state='error';life.phase='error';lifeConvState.tech=e?.message||'';
+      lifeConvState.state='error';life.phase='error';lifeConvState.errorKind='asr';lifeConvState.tech=e?.message||'';
       lifeConvState.error='刚才没听清，可以再说一次，或重试转写。';lifeRefresh();
     }
   };

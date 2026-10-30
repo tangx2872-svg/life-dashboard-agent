@@ -262,7 +262,8 @@ async def transcribe_audio(request: Request, file: UploadFile = File(...)):
     saved = await service.save_audio(file)
     try:
         try:
-            transcript = (await service.asr.transcribe(str(saved.path))).strip()
+            transcript = (await service.asr.transcribe(str(saved.path)) or "").strip()
+            meta: dict = getattr(service.asr, "last_meta", {}) or {}
         except AppError:
             raise
         except Exception:
@@ -271,7 +272,8 @@ async def transcribe_audio(request: Request, file: UploadFile = File(...)):
             raise AppError(code=ErrorCode.ASR_FAILED, message="未识别到语音，请重新录音", status_code=502)
         if len(transcript) > settings.max_text_chars:
             raise AppError(code=ErrorCode.INVALID_REQUEST, message="录音文字超过上限，请分段录音", status_code=413)
-        return {"status": "ok", "transcript": transcript,
+        return {"status": "ok", "transcript": transcript, "provider": meta.get("provider"),
+                "asr_fallback": bool(meta.get("fallback")),
                 "timings": {"asr_ms": int((time.perf_counter()-started)*1000)}}
     finally:
         saved.path.unlink(missing_ok=True)

@@ -25,7 +25,7 @@ from core.errors import AppError, ErrorCode
 from core.logging import get_logger, setup_logging
 from schemas.errors import ErrorDetail, ErrorResponse
 from services.capture_service import CaptureService
-from services.providers import build_asr_provider, build_llm_provider
+from services.providers import build_asr_pool, build_llm_provider
 
 logger = get_logger("app")
 
@@ -36,7 +36,7 @@ async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
     setup_logging(settings.log_level)
     ensure_runtime_dirs(settings)
 
-    asr = build_asr_provider(settings)
+    asr = build_asr_pool(settings)
     llm = build_llm_provider(settings)
 
     app.state.settings = settings
