@@ -7,3 +7,4 @@ backups/
 *.log
 *.zip
 test-results/
+benchmarks/fast-model/out/

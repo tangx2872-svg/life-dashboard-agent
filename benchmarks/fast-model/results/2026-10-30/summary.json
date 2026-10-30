@@ -1,0 +1,516 @@
+{
+  "generatedAt": "2026-10-30T23:42:56.743865",
+  "models": {
+    "DeepSeek-V4.1-Flash": {
+      "calls": 30,
+      "success": 30,
+      "failures": 0,
+      "strict_json_rate": 1.0,
+      "pydantic_rate": 1.0,
+      "apply_rate": 1.0,
+      "expected_match_rate": 0.9,
+      "unnecessary_clarification_rate": 0.0,
+      "ttft_min": 1145.1,
+      "ttft_p50": 2706.2,
+      "ttft_p90": 5515.5,
+      "ttft_max": 8503.3,
+      "total_min": 2063.2,
+      "total_p50": 3840.3,
+      "total_p90": 6474.9,
+      "total_max": 9679.6,
+      "avg_input_tokens": 2006,
+      "avg_output_tokens": 495,
+      "cost_cny_per_1k": 1.993,
+      "cost_cny_per_1k_peak": 3.986,
+      "cost_note": "空闲价；高峰 1.00/4.00",
+      "intents": {
+        "modify": 11,
+        "plan": 19
+      },
+      "cases": {
+        "1": {
+          "runs": 3,
+          "match": 3
+        },
+        "2": {
+          "runs": 3,
+          "match": 3
+        },
+        "3": {
+          "runs": 3,
+          "match": 3
+        },
+        "4": {
+          "runs": 3,
+          "match": 3
+        },
+        "5": {
+          "runs": 3,
+          "match": 0
+        },
+        "6": {
+          "runs": 3,
+          "match": 3
+        },
+        "7": {
+          "runs": 3,
+          "match": 3
+        },
+        "8": {
+          "runs": 3,
+          "match": 3
+        },
+        "9": {
+          "runs": 3,
+          "match": 3
+        },
+        "10": {
+          "runs": 3,
+          "match": 3
+        }
+      }
+    },
+    "GLM-5.3-Flash": {
+      "calls": 30,
+      "success": 30,
+      "failures": 0,
+      "strict_json_rate": 1.0,
+      "pydantic_rate": 1.0,
+      "apply_rate": 1.0,
+      "expected_match_rate": 0.667,
+      "unnecessary_clarification_rate": 0.033,
+      "ttft_min": 880.7,
+      "ttft_p50": 1946.3,
+      "ttft_p90": 5309.2,
+      "ttft_max": 52253.1,
+      "total_min": 3247.0,
+      "total_p50": 4874.7,
+      "total_p90": 8103.4,
+      "total_max": 55558.4,
+      "avg_input_tokens": 1078,
+      "avg_output_tokens": 209,
+      "cost_cny_per_1k": 1.0133,
+      "cost_cny_per_1k_peak": null,
+      "cost_note": "AutoDL 页面价格（用户提供）",
+      "intents": {
+        "modify": 12,
+        "plan": 16,
+        "needs_clarification": 2
+      },
+      "cases": {
+        "1": {
+          "runs": 3,
+          "match": 1
+        },
+        "2": {
+          "runs": 3,
+          "match": 3
+        },
+        "3": {
+          "runs": 3,
+          "match": 0
+        },
+        "4": {
+          "runs": 3,
+          "match": 2
+        },
+        "5": {
+          "runs": 3,
+          "match": 0
+        },
+        "6": {
+          "runs": 3,
+          "match": 2
+        },
+        "7": {
+          "runs": 3,
+          "match": 3
+        },
+        "8": {
+          "runs": 3,
+          "match": 3
+        },
+        "9": {
+          "runs": 3,
+          "match": 3
+        },
+        "10": {
+          "runs": 3,
+          "match": 3
+        }
+      }
+    },
+    "MiniMax-M3.1-Flash": {
+      "calls": 30,
+      "success": 30,
+      "failures": 0,
+      "strict_json_rate": 0.0,
+      "pydantic_rate": 0.0,
+      "apply_rate": 0.0,
+      "expected_match_rate": 0.0,
+      "unnecessary_clarification_rate": 0.0,
+      "ttft_min": 767.8,
+      "ttft_p50": 1928.7,
+      "ttft_p90": 3354.4,
+      "ttft_max": 9007.8,
+      "total_min": 1337.0,
+      "total_p50": 3046.9,
+      "total_p90": 4381.9,
+      "total_max": 10524.5,
+      "avg_input_tokens": 1222,
+      "avg_output_tokens": 254,
+      "cost_cny_per_1k": 2.238,
+      "cost_cny_per_1k_peak": null,
+      "cost_note": "AutoDL 页面价格（用户提供）",
+      "intents": {
+        "none": 30
+      },
+      "cases": {
+        "1": {
+          "runs": 3,
+          "match": 0
+        },
+        "2": {
+          "runs": 3,
+          "match": 0
+        },
+        "3": {
+          "runs": 3,
+          "match": 0
+        },
+        "4": {
+          "runs": 3,
+          "match": 0
+        },
+        "5": {
+          "runs": 3,
+          "match": 0
+        },
+        "6": {
+          "runs": 3,
+          "match": 0
+        },
+        "7": {
+          "runs": 3,
+          "match": 0
+        },
+        "8": {
+          "runs": 3,
+          "match": 0
+        },
+        "9": {
+          "runs": 3,
+          "match": 0
+        },
+        "10": {
+          "runs": 3,
+          "match": 0
+        }
+      }
+    },
+    "gpt-5.6-luna": {
+      "calls": 30,
+      "success": 30,
+      "failures": 0,
+      "strict_json_rate": 1.0,
+      "pydantic_rate": 1.0,
+      "apply_rate": 1.0,
+      "expected_match_rate": 0.933,
+      "unnecessary_clarification_rate": 0.0,
+      "ttft_min": 1326.2,
+      "ttft_p50": 3447.7,
+      "ttft_p90": 4580.9,
+      "ttft_max": 61645.0,
+      "total_min": 2879.6,
+      "total_p50": 5252.5,
+      "total_p90": 9663.7,
+      "total_max": 75392.1,
+      "avg_input_tokens": 1786,
+      "avg_output_tokens": 267,
+      "cost_cny_per_1k": null,
+      "cost_cny_per_1k_peak": null,
+      "cost_note": "接口未提供价格，暂无可靠成本数据",
+      "intents": {
+        "plan": 29,
+        "modify": 1
+      },
+      "cases": {
+        "1": {
+          "runs": 3,
+          "match": 2
+        },
+        "2": {
+          "runs": 3,
+          "match": 3
+        },
+        "3": {
+          "runs": 3,
+          "match": 3
+        },
+        "4": {
+          "runs": 3,
+          "match": 3
+        },
+        "5": {
+          "runs": 3,
+          "match": 2
+        },
+        "6": {
+          "runs": 3,
+          "match": 3
+        },
+        "7": {
+          "runs": 3,
+          "match": 3
+        },
+        "8": {
+          "runs": 3,
+          "match": 3
+        },
+        "9": {
+          "runs": 3,
+          "match": 3
+        },
+        "10": {
+          "runs": 3,
+          "match": 3
+        }
+      }
+    }
+  },
+  "ranking": [
+    "gpt-5.6-luna",
+    "DeepSeek-V4.1-Flash",
+    "GLM-5.3-Flash",
+    "MiniMax-M3.1-Flash"
+  ],
+  "probe": {
+    "DeepSeek-V4.1-Flash": {
+      "low": {
+        "calls": 6,
+        "success": 6,
+        "failures": 0,
+        "strict_json_rate": 1.0,
+        "pydantic_rate": 1.0,
+        "apply_rate": 1.0,
+        "expected_match_rate": 0.5,
+        "unnecessary_clarification_rate": 0.0,
+        "ttft_min": 1423.1,
+        "ttft_p50": 1567.7,
+        "ttft_p90": 2177.9,
+        "ttft_max": 4094.9,
+        "total_min": 2140.7,
+        "total_p50": 2648.8,
+        "total_p90": 3593.6,
+        "total_max": 5268.2,
+        "avg_input_tokens": 1983,
+        "avg_output_tokens": 380,
+        "cost_cny_per_1k": 1.7515,
+        "cost_cny_per_1k_peak": 3.503,
+        "cost_note": "空闲价；高峰 1.00/4.00",
+        "intents": {
+          "modify": 2,
+          "plan": 4
+        },
+        "cases": {
+          "1": {
+            "runs": 3,
+            "match": 3
+          },
+          "5": {
+            "runs": 3,
+            "match": 0
+          }
+        }
+      },
+      "none": {
+        "calls": 6,
+        "success": 6,
+        "failures": 0,
+        "strict_json_rate": 1.0,
+        "pydantic_rate": 1.0,
+        "apply_rate": 1.0,
+        "expected_match_rate": 0.5,
+        "unnecessary_clarification_rate": 0.0,
+        "ttft_min": 2264.3,
+        "ttft_p50": 2892.0,
+        "ttft_p90": 3188.1,
+        "ttft_max": 5418.7,
+        "total_min": 3414.8,
+        "total_p50": 3908.6,
+        "total_p90": 4365.5,
+        "total_max": 6691.6,
+        "avg_input_tokens": 1983,
+        "avg_output_tokens": 498,
+        "cost_cny_per_1k": 1.9875,
+        "cost_cny_per_1k_peak": 3.975,
+        "cost_note": "空闲价；高峰 1.00/4.00",
+        "intents": {
+          "modify": 3,
+          "plan": 3
+        },
+        "cases": {
+          "1": {
+            "runs": 3,
+            "match": 3
+          },
+          "5": {
+            "runs": 3,
+            "match": 0
+          }
+        }
+      }
+    },
+    "GLM-5.3-Flash": {
+      "low": {
+        "calls": 6,
+        "success": 6,
+        "failures": 0,
+        "strict_json_rate": 1.0,
+        "pydantic_rate": 1.0,
+        "apply_rate": 1.0,
+        "expected_match_rate": 0.333,
+        "unnecessary_clarification_rate": 0.0,
+        "ttft_min": 1110.2,
+        "ttft_p50": 1716.9,
+        "ttft_p90": 1965.9,
+        "ttft_max": 6613.8,
+        "total_min": 3687.0,
+        "total_p50": 4638.5,
+        "total_p90": 4941.2,
+        "total_max": 9504.1,
+        "avg_input_tokens": 1054,
+        "avg_output_tokens": 201,
+        "cost_cny_per_1k": 0.9842,
+        "cost_cny_per_1k_peak": null,
+        "cost_note": "AutoDL 页面价格（用户提供）",
+        "intents": {
+          "modify": 5,
+          "plan": 1
+        },
+        "cases": {
+          "1": {
+            "runs": 3,
+            "match": 2
+          },
+          "5": {
+            "runs": 3,
+            "match": 0
+          }
+        }
+      },
+      "none": {
+        "calls": 6,
+        "success": 4,
+        "failures": 2,
+        "strict_json_rate": 0.667,
+        "pydantic_rate": 0.667,
+        "apply_rate": 0.667,
+        "expected_match_rate": 0.167,
+        "unnecessary_clarification_rate": 0.0,
+        "ttft_min": 16816.3,
+        "ttft_p50": 19845.5,
+        "ttft_p90": 34134.3,
+        "ttft_max": 34134.3,
+        "total_min": 20831.8,
+        "total_p50": 23033.6,
+        "total_p90": 40345.8,
+        "total_max": 40345.8,
+        "avg_input_tokens": 1052,
+        "avg_output_tokens": 1492,
+        "cost_cny_per_1k": 3.5134,
+        "cost_cny_per_1k_peak": null,
+        "cost_note": "AutoDL 页面价格（用户提供）",
+        "intents": {
+          "plan": 3,
+          "none": 2,
+          "needs_clarification": 1
+        },
+        "cases": {
+          "1": {
+            "runs": 3,
+            "match": 1
+          },
+          "5": {
+            "runs": 3,
+            "match": 0
+          }
+        }
+      }
+    },
+    "MiniMax-M3.1-Flash": {
+      "low": {
+        "calls": 6,
+        "success": 6,
+        "failures": 0,
+        "strict_json_rate": 0.0,
+        "pydantic_rate": 0.0,
+        "apply_rate": 0.0,
+        "expected_match_rate": 0.0,
+        "unnecessary_clarification_rate": 0.0,
+        "ttft_min": 972.3,
+        "ttft_p50": 1285.8,
+        "ttft_p90": 3019.8,
+        "ttft_max": 3218.0,
+        "total_min": 1898.6,
+        "total_p50": 2067.4,
+        "total_p90": 4361.9,
+        "total_max": 5229.1,
+        "avg_input_tokens": 1202,
+        "avg_output_tokens": 276,
+        "cost_cny_per_1k": 2.306,
+        "cost_cny_per_1k_peak": null,
+        "cost_note": "AutoDL 页面价格（用户提供）",
+        "intents": {
+          "none": 6
+        },
+        "cases": {
+          "1": {
+            "runs": 3,
+            "match": 0
+          },
+          "5": {
+            "runs": 3,
+            "match": 0
+          }
+        }
+      },
+      "none": {
+        "calls": 6,
+        "success": 5,
+        "failures": 1,
+        "strict_json_rate": 0.0,
+        "pydantic_rate": 0.0,
+        "apply_rate": 0.0,
+        "expected_match_rate": 0.0,
+        "unnecessary_clarification_rate": 0.0,
+        "ttft_min": 1286.3,
+        "ttft_p50": 1999.2,
+        "ttft_p90": 11237.6,
+        "ttft_max": 11237.6,
+        "total_min": 1978.1,
+        "total_p50": 2669.9,
+        "total_p90": 12110.3,
+        "total_max": 12110.3,
+        "avg_input_tokens": 1203,
+        "avg_output_tokens": 647,
+        "cost_cny_per_1k": 3.791,
+        "cost_cny_per_1k_peak": null,
+        "cost_note": "AutoDL 页面价格（用户提供）",
+        "intents": {
+          "none": 6
+        },
+        "cases": {
+          "1": {
+            "runs": 3,
+            "match": 0
+          },
+          "5": {
+            "runs": 3,
+            "match": 0
+          }
+        }
+      }
+    }
+  }
+}
