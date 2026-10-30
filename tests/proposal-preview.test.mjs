@@ -17,7 +17,7 @@ function harness(result, phase = 'review', requests = [], reply = {intent: 'plan
     },
     esc: escape,
     lifeWeekday: date => ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][new Date(date + 'T00:00:00Z').getUTCDay()],
-    AbortController, AbortSignal,
+    AbortController, AbortSignal, LIFE_REQUEST_TIMEOUT_MS: 180000,
     lifeDismiss: noop, lifeRefresh: noop, render: noop, toast: noop, lifeTurn: noop,
     lifeDraftInput: noop, lifeComposer: () => '', lifePhaseText: () => '', lifeResult: () => '',
     lifeApply: noop, submitLifeInput: noop, dashboardBoot: {supportsLifeProposals: true},

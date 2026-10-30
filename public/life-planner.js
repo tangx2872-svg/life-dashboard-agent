@@ -20,7 +20,7 @@ async function lifeTurn(text){
   if(life.phase==='thinking'||life.phase==='transcribing')return;
   life.phase='thinking';life.error='';life.result=null;life.text=message;lifeRefresh();
   try{
-    const reply=await productAPI.request('/api/planner/turn',{method:'POST',body:JSON.stringify({sessionId:life.sessionId||undefined,message,...(life.focus?{focus:life.focus}:{})})});
+    const reply=await productAPI.request('/api/planner/turn',{method:'POST',signal:AbortSignal.timeout(LIFE_REQUEST_TIMEOUT_MS),body:JSON.stringify({sessionId:life.sessionId||undefined,message,...(life.focus?{focus:life.focus}:{})})});
     life.sessionId=reply.sessionId;life.result=reply;life.error='';
     if(reply.intent==='clarify'||reply.intent==='answer'||!reply.operations?.length){life.phase='answered'}
     else if(reply.needsConfirmation){life.phase='review'}

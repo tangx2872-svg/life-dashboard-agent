@@ -1,4 +1,6 @@
 // Same-origin only. AI secrets and upstream addresses never enter the frontend.
+// One shared ceiling for Life AI turns: Node AI_BACKEND_TIMEOUT_S and nginx both allow 180s.
+const LIFE_REQUEST_TIMEOUT_MS=180000;
 const productAPI={
   async request(path,options={}){
     const response=await fetch(path,{cache:'no-store',...options,headers:{'Content-Type':'application/json','X-Dashboard-Token':window.dashboardBoot?.csrf||'',...options.headers},signal:options.signal||AbortSignal.timeout(40000)});
