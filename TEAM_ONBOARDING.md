@@ -19,6 +19,21 @@ Life Dashboard（知行 Life Agent）是一个个人生活助理 Web 应用：�
 - 自己注册一个账号使用；线上是共享环境，请不要删除别人的数据。
 - 默认访客入口会带一份演示数据，适合直接截图。
 
+### 服务器（了解即可，不需要每个人登录）
+
+- 公网 IP：`122.51.80.161`
+- SSH：端口 `22`，用户名 `ubuntu`
+- 项目目录：`/opt/life`；AI 后端：`/opt/life/ai-backend`
+- 运行方式：`life-web.service`（Node，127.0.0.1:3000）、`life-ai.service`（Python，127.0.0.1:6016）、MySQL 8（127.0.0.1:3306）、Nginx（80/443）
+- 数据库：MySQL，库名 `life_dashboard`
+- 已授权的 SSH 公钥（**公钥可以公开，但不能用于登录**；私钥由负责人私密提供）：
+
+```
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDAS4eDZIgOKesy1qFLku7Rqn6yxmcBwKaHoQWDsr6lItwoORfdaWfAXjFb6uYvL6lyfsNGi55Vg9pQgV62be91Gq4qPEVIZRLmaCURBARO9XzSX4O5MutvzMVQ9/pcd9rp6eQDB+ccB862CBG9ofp5C0mCrUOoZr2DN3iaOV8oBZHIY1NaMG8xOoGuc46SqvYWBcna1vhC6bD9Im4lrwUmZZ9NM9Gj3R5fjTg2FrN0tkjoWftbApGngl6gOaJuWt7qfmheIuTm9EvWWjS4KTykdy/0yTL94lZ4LyO7DgvbI/XugIez6FFbTUFLJTXRrhX+oMKIS8EhiVeOgLltYDXZ skey-9xqp473p
+```
+
+> 服务器只用于部署、查看日志和验证最终版本。**不要在服务器上长期开发或直接改生产代码。**
+
 ## 3. 拿到代码
 
 仓库（**Public**，可直接 clone）：
@@ -106,10 +121,16 @@ uvicorn app:app --host 127.0.0.1 --port 6016
 
 两个文件都可以 `cp .env.example .env` 起步，把占位符替换成真实值。
 
-## 7. 密钥从哪里拿
+## 7. 需要负责人提供的配置
 
-找项目负责人**私聊**获取，不要在群里发、不要写进文档、不要提交 Git。
-需要哪些密钥见 `TEAM_SECRETS_TEMPLATE.md`。
+以下 4 项需要找负责人**私聊**获取，不要在群里发、不要提交 Git：
+
+- AutoDL LLM API Key（规划模型）
+- Gemini API Key（语音转写）
+- MySQL 账号密码（生产 / 本地各一套）
+- 服务器 SSH 私钥或密码（公钥已在上面，不能用于登录）
+
+填写位置：根目录 `.env` 与 `ai-backend/.env`。完整清单见 `TEAM_SECRETS_TEMPLATE.md`。
 
 ## 8. Git 协作流程
 

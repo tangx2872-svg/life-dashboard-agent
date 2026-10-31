@@ -48,7 +48,7 @@
 - API 前缀：`https://122.51.80.161/api/`
 - AI 健康检查：`http://127.0.0.1:6016/health`（仅服务器本机）；主站转发为 `GET /api/ai/health`
 - Server：`VM-0-16-ubuntu`，Ubuntu 22.04.5 LTS，2 vCPU / 3.6G RAM / 69G 磁盘，无 GPU
-- SSH：`122.51.80.161:22`，用户名 `ubuntu`（密码或密钥由负责人私密提供）
+- SSH：`122.51.80.161:22`，用户名 `ubuntu`；服务器已授权公钥（见 `TEAM_ONBOARDING.md`，公钥不可用于登录），私钥或密码由负责人私密提供
 - Deployment：Nginx（80→443 跳转，443 反代 `127.0.0.1:3000`）+ systemd
   - `life-web.service`：`node --env-file=/opt/life/.env server/index.mjs`
   - `life-ai.service`：`uvicorn app:app --host 127.0.0.1 --port 6016`
@@ -83,7 +83,7 @@ uvicorn app:app --host 127.0.0.1 --port 6016
 - AutoDL LLM API Key（规划模型）
 - Gemini API Key（语音转写）
 - MySQL 账号密码（生产 / 本地各自独立）
-- 服务器 SSH 密码或私钥
+- 服务器 SSH 私钥或密码（公钥已记录在 `TEAM_ONBOARDING.md`，不能用于登录）
 - GitHub Collaborator 邀请
 
 模板见 `TEAM_SECRETS_TEMPLATE.md`。
