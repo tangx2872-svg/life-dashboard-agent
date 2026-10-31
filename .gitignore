@@ -8,3 +8,21 @@ backups/
 *.zip
 test-results/
 benchmarks/fast-model/out/
+
+# ---- secrets / credentials: never commit ----
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+.ssh/
+credentials.json
+*credentials*.json
+*.secret
+secrets/
+TEAM_SECRETS.md
+.env.local
+.env.production

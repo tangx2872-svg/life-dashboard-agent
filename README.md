@@ -1,3 +1,5 @@
+> **团队协作请先读 [TEAM_ONBOARDING.md](TEAM_ONBOARDING.md)**（5～10 分钟上手：clone、本地启动、Git 流程、Secret 获取）。完整交接见 [HANDOVER_REPORT.md](HANDOVER_REPORT.md)。
+
 > **服务器部署请先读 [当前部署交接](docs/SERVER_DEPLOYMENT.md)**（2026-10-30）。当前已具备账户隔离、session、Guest/Demo 与服务端语音转写；本文后面的部分早期阶段记录仅供历史参考。最新首页交互见 [验收报告](docs/AGENT_INTERACTION_REPORT.md)。
 
 > 简化产品重构：日常入口统一为今日、任务、项目、记录；快速记录支持语音与文字，确认保存后显示去向和查看入口。详见 [信息架构](docs/information-architecture.md)、[兼容策略](docs/migration-plan.md) 与 [改动记录](docs/refactor-changelog.md)。
