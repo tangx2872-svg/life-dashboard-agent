@@ -216,6 +216,7 @@ if(typeof lifeTurn==='function'){
   lifeTurn=async function(text){if(!window.lifeAccount?.user)return lifeConvBaseTurn(text);return lifeConvSubmit(text,'text')};
   lifeDraftInput=function(input){lifeConvState.draft=input.value;lifeConvBaseDraft(input)};
   lifeComposer=function(){
+    if(!window.lifeAccount?.user)return lifeConvBaseComposer();
     const keep=life.text;life.text=lifeConvState.draft||'';
     let html;
     try{html=lifeConvBaseComposer()}finally{life.text=keep}

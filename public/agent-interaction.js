@@ -14,7 +14,7 @@ const interactionProjects=()=>typeof data!=='undefined'&&Array.isArray(data&&dat
 function interactionWhen(date,time){if(!date)return '';const parts=String(date).split('-');if(parts.length<3)return String(date);const head=`${Number(parts[1])} 月 ${Number(parts[2])} 日`;return time?`${head} · ${time}`:`${head} · ${lifeWeekday(date)}`}
 function interactionMinutes(op){const value=op?.minutes??op?.estimatedMinutes??op?.durationMinutes;return Number.isFinite(value)&&value>0?Math.round(value):null}
 function interactionDuration(minutes){return minutes>=600?'全天':`约 ${minutes} 分钟`}
-// operations are the only source of truth for the plan preview.
+// Structured proposals preview operations; old rule-planner packets keep their stage preview.
 function interactionPlanRows(r){
   const created=new Map(),rows=[];
   for(const op of r.operations||[]){
@@ -32,6 +32,9 @@ function interactionPlanRows(r){
     const date=op.date||(op.action==='create_task'?'':task?.scheduledDate||task?.dueDate||task?.date||'');
     const time=op.time||(op.action==='create_task'?'':task?.time||'');
     rows.push({kind:'task',title:op.title||task?.title||'任务',when:interactionWhen(date,time),date:date||'',time:time||'',minutes:interactionMinutes(op),project});
+  }
+  if(!rows.length&&!r.proposalId&&r.operations?.length&&Array.isArray(r.plan?.stages)){
+    return r.plan.stages.map(s=>({kind:'task',title:s.title||'任务',date:s.date||'',time:'',when:interactionWhen(s.date),minutes:interactionMinutes(s),project:''}));
   }
   return rows
 }

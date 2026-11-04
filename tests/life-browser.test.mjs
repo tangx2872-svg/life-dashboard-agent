@@ -26,12 +26,12 @@ test('Life: one sentence becomes a plan, then Undo puts everything back',{skip:!
 
   await p.locator('#life-input').fill(SENTENCE);
   await p.locator('#life-input').press('Control+Enter');
-  await p.waitForSelector('.interaction-plan',{timeout:20000});
-  const message=await p.locator('.interaction-plan > p').innerText();
+  await p.waitForSelector('.plan-card',{timeout:20000});
+  const message=await p.locator('.plan-card').innerText();
   assert.match(message,/整理好了/);
-  const steps=await p.locator('.interaction-plan ol li').count();
+  const steps=await p.locator('.plan-group-items > li').count();
   assert.ok(steps>=4,`应拆成多步，实际 ${steps}`);
-  const preview=(await p.locator('.interaction-plan ol').allInnerTexts()).join('\n');
+  const preview=(await p.locator('.plan-rows').allInnerTexts()).join('\n');
   assert.ok(!preview.includes('周六'),'周六被留空');
 
   // Nothing is written before the user accepts.

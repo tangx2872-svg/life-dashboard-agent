@@ -122,3 +122,11 @@ test('Preview: one compact card per revision', () => {
   assert.equal((html.match(/class="plan-card"/g) || []).length, 1);
   assert.doesNotMatch(html, /状态：|新增任务|新建项目/);
 });
+
+test('Preview: old rule packets retain stages but structured proposals never use them', () => {
+ const stages=[{title:'旧规则任务',date:'2026-11-05',minutes:30}];
+ const legacy=harness({operations:[{op:'add'}],plan:{stages}}).lifeResult();
+ assert.match(legacy,/旧规则任务/);
+ const current=harness({proposalId:'p1',operations:[],plan:{stages}}).lifeResult();
+ assert.doesNotMatch(current,/旧规则任务/);
+});
