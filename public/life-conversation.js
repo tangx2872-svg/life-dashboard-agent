@@ -1,9 +1,17 @@
 // One continuous planning conversation: utterances and questions stay visible,
 // while the plan itself is a single card that is replaced in place on every revision.
-const lifeConvState={turns:[],draft:'',editing:null,custom:'',request:0,controller:null,state:'idle',error:'',errorKind:'',tech:'',proposalId:null,version:0,current:null,inline:false,pendingAdjust:''};
+const lifeConvState={turns:[],draft:'',editing:null,custom:'',request:0,controller:null,state:'idle',error:'',errorKind:'',tech:'',proposalId:null,version:0,current:null,inline:false,pendingAdjust:'',waitStartedAt:0,waitTimer:null};
 const LIFE_CONV_PLACEHOLDER='继续说，或者直接讲下一步…';
 function lifeConvId(){return 't'+Math.random().toString(36).slice(2,9)}
-function lifeConvDraft(){const input=document.getElementById('life-input');return input?input.value:(lifeConvState.draft||'')}
+function lifeConvElement(id='life-input'){
+ const dialog=document.getElementById('assistant-command');
+ if(dialog?.open){
+  if(id==='life-input')return dialog.querySelector('.composer textarea');
+  return [...dialog.querySelectorAll('[id]')].find(el=>el.id==='command-'+id)||null;
+ }
+ return document.getElementById(id);
+}
+function lifeConvDraft(){const input=lifeConvElement();return input?input.value:(lifeConvState.draft||'')}
 function lifeConvLastUser(){const rows=lifeConvState.turns.filter(t=>t.role==='user');return rows[rows.length-1]||null}
 function lifeConvPending(){const rows=lifeConvState.turns.filter(t=>t.type==='clarification');const last=rows[rows.length-1];if(!last)return null;const open=(last.questions||[]).filter(q=>!q.answer);return open.length?last:(last.questions||[]).length?null:last}
 function lifeConvErrorText(e){
@@ -17,17 +25,44 @@ function lifeConvRetryable(e){
   return ['AI_BACKEND_UNAVAILABLE','AI_BACKEND_INVALID_RESPONSE','AI_CAPTURE_FAILED'].includes(String(e?.code||''))||/格式|不完整|解析|不可用/.test(String(e?.message||''));
 }
 function lifeConvPush(turn){lifeConvState.turns.push({id:lifeConvId(),...turn});return lifeConvState.turns[lifeConvState.turns.length-1]}
+function lifeConvWaitCopy(seconds){
+ if(seconds>=45)return {title:'等待时间较长',detail:'还没有收到方案，可以继续等待，或取消后稍后重试。'};
+ if(seconds>=15)return {title:'仍在等待回复',detail:'服务暂未返回方案，你的原话保留在本次对话中。'};
+ return lifeConvState.state==='recovering'
+  ?{title:'正在重新尝试整理',detail:'刚才没有获得完整回复，正在等待本次结果。'}
+  :{title:'正在整理你的安排',detail:'方案返回后先供你检查，确认后才会加入计划。'};
+}
+function lifeConvWaitSeconds(){return lifeConvState.waitStartedAt?Math.max(0,Math.floor((Date.now()-lifeConvState.waitStartedAt)/1000)):0}
+function lifeConvUpdateWaiting(){
+ if(life.phase!=='thinking')return;
+ const seconds=lifeConvWaitSeconds(),copy=lifeConvWaitCopy(seconds);
+ for(const [selector,value]of [['[data-life-wait-title]',copy.title],['[data-life-wait-detail]',copy.detail],['[data-life-wait-elapsed]',`已等待 ${seconds} 秒`]])document.querySelectorAll(selector).forEach(el=>{if(el.textContent!==value)el.textContent=value});
+}
+function lifeConvStartWaiting(keepStart=false){
+ clearInterval(lifeConvState.waitTimer);
+ if(!keepStart||!lifeConvState.waitStartedAt)lifeConvState.waitStartedAt=Date.now();
+ lifeConvState.waitTimer=setInterval(lifeConvUpdateWaiting,1000);
+}
+function lifeConvStopWaiting(){clearInterval(lifeConvState.waitTimer);lifeConvState.waitTimer=null;lifeConvState.waitStartedAt=0}
+function lifeConvCancel(){
+ if(life.phase!=='thinking')return;
+ const draft=lifeConvDraft();
+ lifeConvState.request++;lifeConvState.controller?.abort();lifeConvState.controller=null;lifeConvStopWaiting();
+ lifeConvState.draft=draft;lifeConvState.state='cancelled';lifeConvState.error='';lifeConvState.errorKind='';lifeConvState.tech='';
+ life.phase='idle';life.error='';lifeRefresh();lifeConvFocus();
+}
 // --- rendering -----------------------------------------------------------
 function lifeConvQuestionHtml(turn,q){
   const key=turn.id+':'+q.id,open=lifeConvState.custom===key,inputId=`life-custom-${turn.id}-${q.id}`;
   if(q.answer)return `<div class="turn-question"><p class="turn-ask">${esc(q.question)}</p><p class="turn-answer">✓ ${esc(q.answer)}</p></div>`;
   const custom=q.allowCustom!==false;
-  return `<div class="turn-question"><p class="turn-ask">${esc(q.question)}</p><div class="clarification-options">${(q.options||[]).map(o=>`<button type="button" class="chip" onclick="lifeConvPick('${turn.id}','${esc(q.id)}','${esc(o.label)}')">${esc(o.label)}</button>`).join('')}${custom?`<button type="button" class="chip chip-quiet" onclick="lifeConvCustom('${turn.id}','${esc(q.id)}','open')">自己填写</button>`:''}</div>${custom?`<div class="turn-custom" ${open?'':'hidden'}><input id="${inputId}" placeholder="用自己的话说" aria-label="${esc(q.question)}" onkeydown="if(event.key==='Enter'&&!event.isComposing){event.preventDefault();lifeConvCustom('${turn.id}','${esc(q.id)}','send',this.value)}"><button type="button" onclick="lifeConvCustom('${turn.id}','${esc(q.id)}','send',document.getElementById('${inputId}').value)">就这个</button></div>`:''}</div>`;
+  return `<div class="turn-question"><p class="turn-ask">${esc(q.question)}</p><div class="clarification-options">${(q.options||[]).map(o=>`<button type="button" class="chip" onclick="lifeConvPick('${turn.id}','${esc(q.id)}','${esc(o.label)}')">${esc(o.label)}</button>`).join('')}${custom?`<button type="button" class="chip chip-quiet" onclick="lifeConvCustom('${turn.id}','${esc(q.id)}','open')">自己填写</button>`:''}</div>${custom?`<div class="turn-custom" ${open?'':'hidden'}><input id="${inputId}" placeholder="用自己的话说" aria-label="${esc(q.question)}" onkeydown="if(event.key==='Enter'&&!event.isComposing){event.preventDefault();lifeConvCustom('${turn.id}','${esc(q.id)}','send',this.value)}"><button type="button" onclick="lifeConvCustom('${turn.id}','${esc(q.id)}','send')">就这个</button></div>`:''}</div>`;
 }
 function lifeConvCurrentHtml(){
   const cur=lifeConvState.current;if(!cur)return '';
-  const undo=typeof lifeCoreBatch!=='undefined'&&lifeCoreBatch?'：<button class="link" onclick="lifeCoreUndo()">撤销这次安排</button>':'';
-  return `<div class="thread-plan">${interactionPlanCard(cur.reply,{mode:'conv',confirmed:cur.confirmed,adjusted:cur.adjusted,history:cur.history,inline:lifeConvState.inline,busy:life.phase==='applying',undo})}</div>`
+  const busy=['thinking','transcribing','listening','applying'].includes(life.phase)||(typeof storageState!=='undefined'&&storageState.writing);
+  const undo=cur.confirmed&&typeof lifeCoreBatch!=='undefined'&&lifeCoreBatch===cur.changeBatchId?`：<button class="link" onclick="lifeCoreUndo()" ${busy?'disabled':''}>撤销这次安排</button>`:'';
+  return `<div class="thread-plan">${interactionPlanCard(cur.reply,{mode:'conv',confirmed:cur.confirmed,undone:cur.undone,updating:life.phase==='thinking',adjusted:cur.adjusted,history:cur.history,inline:lifeConvState.inline,busy,undo})}</div>`
 }
 function lifeConvTurnHtml(turn){
   if(turn.role==='user')return `<li class="turn turn-user" data-turn="${turn.id}"><div class="turn-body"><p class="turn-text">${esc(turn.text)}</p><small class="turn-meta">${turn.source==='voice'?'语音':'打字'}</small></div>${turn.editable===false?'':`<button type="button" class="turn-edit" onclick="lifeConvEdit('${turn.id}')" aria-label="修改这句话">改一下</button>`}</li>`;
@@ -38,8 +73,11 @@ function lifeConvStatusHtml(){
   if(life.phase==='listening')return '<p class="thread-status" role="status">正在听… 说完点一下麦克风。</p>';
   if(life.phase==='transcribing')return '<p class="thread-status" role="status">正在识别…</p>';
   if(life.phase==='applying')return '<p class="thread-status" role="status">正在保存你的安排…</p>';
-  if(lifeConvState.state==='recovering')return '<p class="thread-status" role="status">正在换一种方式重新整理…</p>';
-  if(life.phase==='thinking')return '<p class="thread-status" role="status">正在整理…</p>';
+  if(life.phase==='thinking'){
+    const seconds=lifeConvWaitSeconds(),copy=lifeConvWaitCopy(seconds);
+    return `<div class="thread-wait"><div class="wait-copy" role="status"><strong data-life-wait-title>${esc(copy.title)}</strong><p data-life-wait-detail>${esc(copy.detail)}</p></div><div class="wait-actions"><small data-life-wait-elapsed aria-live="off">已等待 ${seconds} 秒</small><button type="button" class="link" onclick="lifeConvCancel()">取消等待</button></div></div>`;
+  }
+  if(lifeConvState.state==='cancelled')return '<div class="thread-paused" role="status"><p>已取消等待，原话和已有方案保留在本次对话中。</p><div class="row-actions"><button type="button" onclick="lifeConvRetry()">重新整理</button><button type="button" class="link" onclick="lifeConvFocus()">继续补充</button></div></div>';
   if(lifeConvState.state==='error'){
     const asr=lifeConvState.errorKind==='asr';
     const actions=asr
@@ -53,12 +91,15 @@ function lifeConvStatusHtml(){
 function lifeThreadHtml(){
   const status=lifeConvStatusHtml(),plan=lifeConvCurrentHtml();
   if(!lifeConvState.turns.length&&!status&&!plan)return '';
-  const head=`<div class="thread-head"><span>这次安排</span><button type="button" class="link" onclick="lifeConvReset()">新对话</button></div>`;
+  const saving=life.phase==='applying'||(typeof storageState!=='undefined'&&storageState.writing);
+  const head=`<div class="thread-head"><span>这次安排</span><div class="thread-actions"><button type="button" class="link thread-latest" data-thread-latest hidden onclick="lifeConvLatest(this)">回到最新</button><button type="button" class="link" onclick="lifeConvReset()" ${saving?'disabled':''}>新对话</button></div></div>`;
   const turns=lifeConvState.turns.length?`<ol class="thread-turns">${lifeConvState.turns.map(lifeConvTurnHtml).join('')}</ol>`:'';
-  return `<section class="life-thread" aria-label="这次安排的对话记录">${head}${turns}${plan}${status}</section>`;
+  return `<div class="life-conversation">${turns||plan?`<section class="life-thread" tabindex="0" aria-label="这次安排的对话记录" onscroll="lifeConvScrolled(this)">${head}${turns}${plan}</section>`:''}${status}</div>`;
 }
+function lifeConvScrolled(region){const button=region.querySelector('[data-thread-latest]');if(button)button.hidden=region.scrollHeight-region.clientHeight-region.scrollTop<48}
+function lifeConvLatest(button){const region=button.closest('.life-thread');if(!region)return;region.scrollTop=region.scrollHeight;lifeConvScrolled(region);region.focus?.({preventScroll:true})}
 // --- flow ---------------------------------------------------------------
-function lifeConvFocus(){const input=document.getElementById('life-input');if(!input)return setTimeout(lifeConvFocus,80);input.focus();input.scrollIntoView({block:'center',behavior:'smooth'})}
+function lifeConvFocus(){const input=lifeConvElement();if(!input)return;input.focus();input.scrollIntoView({block:'nearest',behavior:window.matchMedia?.('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'})}
 function lifeConvAccept(reply){
   life.result=reply;
   const asksBack=reply.intent==='answer'&&/[？?]\s*$/.test(String(reply.message||''))&&!(reply.operations||[]).length;
@@ -90,7 +131,7 @@ async function lifeConvSend({text,proposalId,mode='first'}){
   const request=++lifeConvState.request;
   lifeConvState.controller?.abort();
   const controller=new AbortController();lifeConvState.controller=controller;
-  lifeConvState.state=mode==='retry'?'recovering':'planning';life.phase='thinking';lifeConvState.error='';lifeRefresh();
+  lifeConvState.state=mode==='retry'?'recovering':'planning';life.phase='thinking';lifeConvState.error='';lifeConvStartWaiting(mode==='retry');lifeRefresh();
   const payload={message:text,...(typeof lifeCoreContext==='function'?lifeCoreContext():{}),...(proposalId?{proposalId}:{})};
   const timeout=typeof LIFE_REQUEST_TIMEOUT_MS==='number'?LIFE_REQUEST_TIMEOUT_MS:180000;
   try{
@@ -108,7 +149,7 @@ async function lifeConvSend({text,proposalId,mode='first'}){
       return lifeConvSend({text,proposalId,mode:'retry'});
     }
     lifeConvState.state='error';life.phase='error';lifeConvState.errorKind='plan';lifeConvState.tech=e.message||'';lifeConvState.error=lifeConvErrorText(e);
-  }finally{if(request===lifeConvState.request)lifeRefresh()}
+  }finally{if(request===lifeConvState.request){lifeConvStopWaiting();lifeConvState.controller=null;lifeRefresh()}}
 }
 function lifeConvSubmit(text,source='text'){
   const message=String(text||'').trim();if(!message)return;
@@ -142,8 +183,8 @@ function lifeConvPick(turnId,qid,label){
 }
 function lifeConvCustom(turnId,qid,action,value){
   const key=turnId+':'+qid;
-  if(action==='open'){lifeConvState.custom=lifeConvState.custom===key?'':key;lifeRefresh();document.getElementById(`life-custom-${turnId}-${qid}`)?.focus();return}
-  const text=String(value||document.getElementById(`life-custom-${turnId}-${qid}`)?.value||'').trim();
+  if(action==='open'){lifeConvState.custom=lifeConvState.custom===key?'':key;lifeRefresh();lifeConvElement(`life-custom-${turnId}-${qid}`)?.focus();return}
+  const text=String(value||lifeConvElement(`life-custom-${turnId}-${qid}`)?.value||'').trim();
   if(!text)return;lifeConvPick(turnId,qid,text);
 }
 function lifeConvAnswer(turn){
@@ -156,14 +197,14 @@ function lifeConvAnswer(turn){
 }
 function lifeConvAsk(text){lifeConvSubmit(text,'text')}
 function lifeConvAdjust(){
-  if(life.phase==='applying')return;
+  if(['thinking','transcribing','listening','applying'].includes(life.phase))return;
   lifeConvState.inline=!lifeConvState.inline;
   lifeRefresh();
-  if(lifeConvState.inline)setTimeout(()=>document.getElementById('plan-inline-input')?.focus(),60);
+  if(lifeConvState.inline)setTimeout(()=>lifeConvElement('plan-inline-input')?.focus(),60);
 }
 function lifeConvInlineCancel(){lifeConvState.inline=false;lifeRefresh()}
 function lifeConvInlineSend(){
-  const input=document.getElementById('plan-inline-input');
+  const input=lifeConvElement('plan-inline-input');
   const text=String(input?.value||'').trim();
   if(!text)return input?.focus();
   lifeConvState.inline=false;
@@ -186,26 +227,41 @@ function lifeConvSaveRaw(){
 function lifeConvEdit(turnId){
   const index=lifeConvState.turns.findIndex(t=>t.id===turnId&&t.role==='user');if(index<0)return;
   const turn=lifeConvState.turns[index];
-  lifeConvState.controller?.abort();lifeConvState.request++;
+  lifeConvState.controller?.abort();lifeConvState.request++;lifeConvStopWaiting();
   lifeConvState.turns.splice(index);lifeConvState.proposalId=null;lifeConvState.version=0;
   lifeConvState.current=null;lifeConvState.inline=false;lifeConvState.pendingAdjust='';
   lifeConvState.draft=turn.text;lifeConvState.state='idle';life.phase='idle';life.result=null;life.error='';
-  lifeRefresh();setTimeout(()=>{const input=document.getElementById('life-input');if(input){input.focus();input.setSelectionRange(input.value.length,input.value.length)}},40);
+  lifeRefresh();setTimeout(()=>{const input=lifeConvElement();if(input){input.focus();input.setSelectionRange(input.value.length,input.value.length)}},40);
 }
 async function lifeConvConfirm(){
   const cur=lifeConvState.current;
-  if(!cur||cur.confirmed||life.phase==='applying')return;
+  if(!cur||cur.confirmed||cur.undone||['thinking','transcribing','listening','applying'].includes(life.phase))return;
   if(!cur.reply?.proposalId)return toast('这个方案已经失效，重新整理一次吧。');
   agentInteraction.dirty=false;
   life.result=cur.reply;lifeConvState.state='applying';lifeRefresh();
   try{
     await lifeApply(cur.reply.operations);
-    if(life.phase==='done'){cur.confirmed=true;lifeConvState.state='done';lifeConvPush({role:'assistant',type:'answer',reply:{message:'已经按这个方案安排好了。'}})}
+    if(life.phase==='done'){
+      cur.confirmed=true;cur.changeBatchId=typeof lifeCoreBatch!=='undefined'?lifeCoreBatch:null;
+      lifeConvState.proposalId=null;lifeConvState.version=0;lifeConvState.state='done';
+      lifeConvPush({role:'assistant',type:'answer',changeBatchId:cur.changeBatchId,reply:{message:'已经按这个方案安排好了。'}});
+    }
   }catch(e){lifeConvState.state='error';lifeConvState.error='没能保存，数据没有改动。';lifeConvState.tech=e?.message||''}
   lifeRefresh();
 }
+function lifeConvDidUndo(batch){
+ const cur=lifeConvState.current;
+ if(cur?.changeBatchId===batch){
+  cur.undone=true;cur.confirmed=false;cur.proposalId=null;cur.reply={...cur.reply,proposalId:null};
+  lifeConvState.proposalId=null;lifeConvState.version=0;lifeConvState.inline=false;lifeConvState.state='done';
+ }
+ const receipt=lifeConvState.turns.find(t=>t.changeBatchId===batch);
+ if(receipt)receipt.reply={message:'这次安排已撤销。'};
+ else lifeConvPush({role:'assistant',type:'answer',reply:{message:'上一次保存的安排已撤销。'}});
+}
 function lifeConvReset(){
-  lifeConvState.controller?.abort();lifeConvState.request++;
+  if(life.phase==='applying'||(typeof storageState!=='undefined'&&storageState.writing))return;
+  lifeConvState.controller?.abort();lifeConvState.request++;lifeConvStopWaiting();
   Object.assign(lifeConvState,{turns:[],draft:'',editing:null,custom:'',state:'idle',error:'',errorKind:'',tech:'',proposalId:null,version:0,current:null,inline:false,pendingAdjust:''});
   life.result=null;life.phase='idle';life.error='';life.text='';lifeRefresh();
   setTimeout(lifeConvFocus,60);
@@ -266,4 +322,17 @@ if(typeof lifeTurn==='function'){
     return lifeConvSubmit(text,'text');
   };
   render();
+}
+
+// DOM rendering replaces the transcript. Preserve readers' position across updates,
+// and follow a new reply only when they were already at the end.
+function lifeConvKeepScroll(action){
+ const previous=[...document.querySelectorAll('.life-thread')].map(el=>({surface:el.closest('dialog')?.id||'home',top:el.scrollTop,atEnd:el.scrollHeight-el.clientHeight-el.scrollTop<48}));
+ const result=action();
+  document.querySelectorAll('.life-thread').forEach(el=>{const before=previous.find(p=>p.surface===(el.closest('dialog')?.id||'home'));el.scrollTop=!before||before.atEnd?el.scrollHeight:before.top;lifeConvScrolled(el)});
+ return result;
+}
+const lifeConvRender=render;render=function(...args){return lifeConvKeepScroll(()=>lifeConvRender(...args))};
+if(typeof dashboardRenderCommand==='function'){
+ const lifeConvCommand=dashboardRenderCommand;dashboardRenderCommand=function(...args){return lifeConvKeepScroll(()=>lifeConvCommand(...args))};
 }

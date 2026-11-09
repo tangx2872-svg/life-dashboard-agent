@@ -8,6 +8,7 @@
   },
   "scripts": {
     "start": "node --env-file-if-exists=.env server/index.mjs",
+    "preview:ui": "node scripts/preview-ui.mjs",
     "test": "node --env-file-if-exists=.env --test tests/*.test.mjs",
     "local:mysql": "node scripts/local-mysql.mjs",
     "stop:mysql": "node scripts/local-mysql.mjs stop",

@@ -1,9 +1,10 @@
 // Progressive enhancement: reuse the existing planner and persistence boundaries.
 function dashboardRows(){
  const end=today(),start=lifeAddDays(end,-29);
- return {history:(data.history||[]).filter(h=>h.date.slice(0,10)>=start&&h.date.slice(0,10)<=end),late:(data.tasks||[]).filter(t=>!t.done&&taskDate(t)&&taskDate(t)<end)};
+ const inRange=r=>{const day=String(r.date||'').slice(0,10);return /^\d{4}-\d{2}-\d{2}$/.test(day)&&day>=start&&day<=end};
+ return {history:(data.history||[]).filter(inRange),activities:simpleRecords().filter(inRange),late:(data.tasks||[]).filter(t=>!t.done&&taskDate(t)&&taskDate(t)<end)};
 }
-function dashboardMetrics(){const {history,late}=dashboardRows();return `<section class="assistant-metrics" aria-label="最近30天"><button onclick="dashboardDetail('done')"><b>${history.filter(h=>h.type!=='项目变化').length}</b><span>近30天完成 →</span></button><button onclick="dashboardDetail('days')"><b>${new Set(history.map(h=>h.date.slice(0,10))).size}</b><span>有进展的天数 →</span></button><button onclick="dashboardDetail('late')"><b>${late.length}</b><span>需要重新安排 →</span></button></section>`}
+function dashboardMetrics(){const {activities,late}=dashboardRows();return `<section class="assistant-metrics" aria-label="最近30天"><button onclick="dashboardDetail('done')"><b>${activities.filter(r=>r.recordType==='complete').length}</b><span>近30天完成 ${lifeIcon('arrow')}</span></button><button onclick="dashboardDetail('days')"><b>${new Set(activities.map(r=>String(r.date).slice(0,10))).size}</b><span>有进展的天数 ${lifeIcon('arrow')}</span></button><button onclick="dashboardDetail('late')"><b>${late.length}</b><span>需要重新安排 ${lifeIcon('arrow')}</span></button></section>`}
 function dashboardDetail(kind,date=''){
  let d=document.getElementById('insight-detail');if(!d){d=document.createElement('dialog');d.id='insight-detail';d.className='insight-drawer';document.body.append(d)}
  const {history,late}=dashboardRows(),rows=date?history.filter(h=>h.date.slice(0,10)===date):history;
@@ -21,13 +22,17 @@ function dashboardCommand(){
  const p=pid?project(pid):null;
  if(p)life.focus={id:p.id,title:p.title};else if(!document.getElementById('assistant-command')?.open){life.focus=null;life.sessionId=''}
  let d=document.getElementById('assistant-command');if(!d){d=document.createElement('dialog');d.id='assistant-command';document.body.append(d);d.addEventListener('close',()=>{if(life.phase==='listening'){lifeAudio.cancelled=true;lifeAudio.recorder?.stop()}})}
- d.dataset.context=p?.title||'全局助理';dashboardRenderCommand();if(!d.open)d.showModal();d.querySelector('textarea')?.focus();
+ d.dataset.context=p?.title||'全局助理';dashboardRenderCommand();if(!d.open)d.showModal();d.querySelector('.composer textarea')?.focus();
 }
-function dashboardRenderCommand(){const d=document.getElementById('assistant-command');if(!d?.open&& !d)return;d.innerHTML=`<button class="capture-close" onclick="document.getElementById('assistant-command').close()" aria-label="关闭助理">✕</button><p class="quiet">${esc(d.dataset.context||'全局助理')}</p>${lifeComposer().replace('id="life-input"','id="command-input"').replace('id="life-mic"','id="command-mic"')} ${lifeResult()}<button onclick="document.getElementById('assistant-command').close();productAsk(life.focus?.id||'')">记录笔记 / 快速采集 →</button>`}
+function dashboardRenderCommand(){
+ const d=document.getElementById('assistant-command');if(!d)return;
+ const composer=lifeComposer().replace(/\bid="(life-input|life-mic|life-mic-time|plan-inline-input|life-custom-[^"]+)"/g,(_,id)=>`id="${id==='life-input'?'command-input':id==='life-mic'?'command-mic':'command-'+id}"`);
+ d.innerHTML=`<button class="capture-close" onclick="document.getElementById('assistant-command').close()" aria-label="关闭助理">${lifeIcon('close')}</button><p class="quiet">${esc(d.dataset.context||'全局助理')}</p>${composer}${lifeResult()}<button class="link assistant-capture-link" onclick="document.getElementById('assistant-command').close();productAsk(life.focus?.id||'')">记录笔记 / 快速采集 ${lifeIcon('arrow')}</button>`;
+}
 const dashboardRefresh=lifeRefresh;
 lifeRefresh=function(){if(document.getElementById('assistant-command')?.open)dashboardRenderCommand();else dashboardRefresh()};
 lifeFocusComposer=dashboardCommand;
 productCommand=dashboardCommand;
-const dashboardFloating=document.querySelector('.floating');if(dashboardFloating){dashboardFloating.hidden=false;dashboardFloating.textContent='🎙';dashboardFloating.setAttribute('aria-label','打开 AI 助理');dashboardFloating.onclick=dashboardCommand}
+const dashboardFloating=document.querySelector('.floating');if(dashboardFloating){dashboardFloating.hidden=false;dashboardFloating.innerHTML=lifeIcon('mic');dashboardFloating.setAttribute('aria-label','打开 AI 助理');dashboardFloating.onclick=dashboardCommand}
 const dashboardStyle=document.createElement('link');dashboardStyle.rel='stylesheet';dashboardStyle.href='voice-dashboard.css';document.head.append(dashboardStyle);
 render();

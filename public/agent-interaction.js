@@ -91,18 +91,20 @@ function interactionPlanCard(reply,options={}){
   else if(projectRow?.when)list=`<p class="plan-single"><span class="plan-when">${esc(projectRow.when)}</span></p>`;
   const warning=(r.warnings||[]).filter(Boolean)[0];
   const warningLine=warning?`<p class="plan-warning">⚠ ${esc(interactionShortWarning(warning))}</p>`:'';
-  const chips=interactionAdjustments(r,opts.adjusted);
-  const chipLine=chips.length?`<div class="plan-adjust"><span>还可以</span><div class="clarification-options">${chips.map(item=>`<button type="button" class="chip" onclick="${opts.mode==='conv'?'lifeConvAsk':'lifeTurn'}(this.textContent)">${esc(item)}</button>`).join('')}</div></div>`:'';
+  const chips=opts.confirmed||opts.undone?[]:interactionAdjustments(r,opts.adjusted);
+  const chipLine=chips.length?`<div class="plan-adjust"><span>还可以</span><div class="clarification-options">${chips.map(item=>`<button type="button" class="chip" onclick="${opts.mode==='conv'?'lifeConvAsk':'lifeTurn'}(this.textContent)" ${opts.busy?'disabled':''}>${esc(item)}</button>`).join('')}</div></div>`:'';
   const confirm=opts.mode==='conv'?'onclick="lifeConvConfirm()"':'onclick="lifeApply(life.result.operations)"';
   const adjust=opts.mode==='conv'?'onclick="lifeConvAdjust()"':'onclick="interactionEdit()"';
-  const disabled=!count||opts.confirmed||opts.busy;
-  const actions=opts.confirmed
+  const disabled=!count||opts.confirmed||opts.undone||opts.busy;
+  const actions=opts.undone
+    ?'<p class="plan-undone" role="status">这次安排已撤销，可在下方重新告诉我你的想法。</p>'
+    :opts.confirmed
     ?`<p class="plan-saved">✓ 已保存${opts.undo||''}</p>`
-    :`<div class="row-actions plan-actions"><button class="primary" ${confirm} ${disabled?'disabled':''}>确认安排</button><button ${adjust}>继续调整</button></div>`;
-  const inline=opts.inline?`<div class="plan-inline"><textarea id="plan-inline-input" rows="2" maxlength="2000" placeholder="还有哪里想改？" aria-label="继续调整方案" onkeydown="if(event.key==='Enter'&&(event.ctrlKey||event.metaKey)&&!event.isComposing){event.preventDefault();lifeConvInlineSend()}"></textarea><div class="row-actions"><button class="primary" onclick="lifeConvInlineSend()">更新方案</button><button class="link" onclick="lifeVoice()">用语音说</button><button class="link" onclick="lifeConvInlineCancel()">取消</button></div></div>`:'';
+    :`<div class="row-actions plan-actions"><button class="primary" ${confirm} ${disabled?'disabled':''}>确认安排</button><button ${adjust} ${opts.busy?'disabled':''}>继续调整</button></div>`;
+  const inline=opts.inline&&!opts.undone&&!opts.confirmed?`<div class="plan-inline"><textarea id="plan-inline-input" rows="2" maxlength="2000" placeholder="还有哪里想改？" aria-label="继续调整方案" onkeydown="if(event.key==='Enter'&&(event.ctrlKey||event.metaKey)&&!event.isComposing){event.preventDefault();lifeConvInlineSend()}"></textarea><div class="row-actions"><button class="primary" onclick="lifeConvInlineSend()">更新方案</button><button class="link" onclick="lifeVoice()">用语音说</button><button class="link" onclick="lifeConvInlineCancel()">取消</button></div></div>`:'';
   const history=(opts.history||[]).filter(Boolean);
   const historyLine=history.length?`<details class="plan-history"><summary>查看修改历史</summary><ol>${history.map(item=>`<li><span>${item.version?`v${esc(item.version)}`:'上一版'}</span>${esc(interactionClip(item.summary||'上一版方案',40))}</li>`).join('')}</ol></details>`:'';
-  return `<section class="plan-card" aria-label="当前方案"><p class="plan-heading">我准备这样安排</p>${adjusted}<h2 class="plan-title">${esc(title)}</h2>${projectLine}${briefLine}${list}${warningLine}${chipLine}${actions}${inline}${historyLine}</section>`
+  return `<section class="plan-card ${opts.undone?'is-undone':''}" aria-label="当前方案"><p class="plan-heading">${opts.undone?'已撤销的方案':opts.confirmed?'已保存的安排':opts.updating?'上一版方案 · 正在等待更新':'我准备这样安排'}</p>${adjusted}<h2 class="plan-title">${esc(title)}</h2>${projectLine}${briefLine}${list}${opts.undone?'':warningLine}${chipLine}${actions}${inline}${historyLine}</section>`
 }
 const interactionResult=lifeResult;lifeResult=function(){const r=life.result;if(!r||['idle','thinking','listening','transcribing'].includes(life.phase))return '';if(life.phase==='clarifying'){const questions=(r.questions||[]).slice(0,3);return `<section class="clarification-card"><h2>Life 想确认一下</h2><p>${esc(r.understanding||r.message)}</p>${questions.map(q=>`<div class="clarification-question"><h3>${esc(q.question)}</h3><div class="clarification-options">${q.options.map(o=>`<button type="button" data-question="${esc(q.id)}" data-answer="${esc(o.label)}" aria-pressed="false" onclick="interactionPick(this)">${esc(o.label)}</button>`).join('')}</div>${q.allowCustom?`<label class="clarification-custom">也可以自己说<input aria-label="${esc(q.question)} 自定义回答" data-question="${esc(q.id)}" oninput="interactionCustom(this)"></label>`:''}</div>`).join('')}${questions.length?'<button type="button" class="primary" data-continue disabled onclick="interactionContinue()">继续安排</button>':'<button type="button" onclick="interactionEdit()">补充一下</button>'}</section>`}if(life.phase==='review')return interactionPlanCard(r,{busy:agentInteraction.dirty});return ''};
 const interactionComposer=lifeComposer;lifeComposer=function(){return interactionComposer().replace(/disabled oninput="lifeDraftInput/g,'oninput="lifeDraftInput')};
