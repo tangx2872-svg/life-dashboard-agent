@@ -46,3 +46,36 @@
 .thread-plan{margin-top:14px;padding-top:6px;border-top:1px solid var(--line,#edf1e8)}
 .thread-plan .plan-card{margin:10px 0 2px}
 @media(max-width:390px){.thread-plan{margin-top:12px}}
+
+
+/* Keep the current plan and conversation in a bounded, keyboard-scrollable area. */
+.life-thread{max-height:min(44dvh,460px);overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
+.life-thread:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+#assistant-command .life-thread{max-height:min(42dvh,440px)}
+#assistant-command .hero h1{font-size:26px}
+#assistant-command .hero-description{display:none}
+#assistant-command .composer textarea{min-height:72px}
+.thread-head{position:sticky;top:-18px;z-index:1;background:var(--paper,#fff);padding:10px 0}
+.thread-actions{display:flex;align-items:center;justify-content:flex-end;gap:12px;flex-wrap:wrap}
+.thread-actions .thread-latest{color:var(--accent);font-weight:550}
+.thread-wait{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 16px;margin:12px 0;background:#f0f5ed;border:1px solid #dce6d6;border-radius:12px}
+.wait-copy{min-width:0}
+.wait-copy strong{display:block;font-size:14px;font-weight:550;color:#3e5a40}
+.wait-copy p{margin:4px 0 0;font-size:12px;line-height:1.7;color:#61715f}
+.wait-actions{display:flex;flex:none;flex-direction:column;align-items:flex-end;gap:4px}
+.wait-actions small{font-size:11px;color:#61715f;font-variant-numeric:tabular-nums}
+.wait-actions .link{padding:8px 10px;min-height:40px;background:#fff;border:1px solid #cddcc7;border-radius:8px;font-size:12px;white-space:nowrap}
+.thread-paused{margin:12px 0;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:#f5f7f2}
+.thread-paused p{margin:0 0 10px;font-size:13px;color:#61715f;line-height:1.7}
+.thread-paused .row-actions{margin:0}
+.life-conversation>.thread-status{font-size:13px;color:var(--muted);margin:12px 0}
+@media(max-width:760px){
+ .life-thread{max-height:40dvh}
+ #assistant-command .life-thread{max-height:38dvh}
+ .thread-head{top:-14px}
+ #assistant-command .hero h1{font-size:23px}
+ .thread-wait{display:block;padding:12px 14px}
+ .wait-actions{flex-direction:row;align-items:center;justify-content:space-between;gap:12px;margin-top:10px}
+ .wait-actions .link{min-height:44px}
+}
+@media(prefers-reduced-motion:reduce){.turn-status::after{animation:none}}

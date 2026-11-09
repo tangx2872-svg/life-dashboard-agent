@@ -84,7 +84,7 @@ function lifeTodayTasks(){
   const ids=new Set();
   if(data.todayFocus?.date===today())for(const id of data.todayFocus.taskIds)ids.add(id);
   for(const t of data.tasks)if(!t.done&&(t.scheduledDate===today()||t.dueDate===today()||t.date===today()))ids.add(t.id);
-  return [...ids].map(id=>data.tasks.find(t=>t.id===id)).filter(Boolean)
+  return [...ids].map(id=>data.tasks.find(t=>t.id===id)).filter(t=>t&&!t.done)
     .sort((a,b)=>String(a.time||'99:99').localeCompare(String(b.time||'99:99')));
 }
 function lifeDismiss(){life.result=null;life.phase='idle';life.text='';life.error='';lifeRefresh()}
@@ -113,7 +113,7 @@ async function lifeVoice(){
       await lifeTranscribe();
     };
     recorder.start(1000);lifeAudio.startedAt=Date.now();
-    lifeAudio.clock=setInterval(()=>{const el=document.getElementById('life-mic-time');if(!el)return;const seconds=Math.floor((Date.now()-lifeAudio.startedAt)/1000);el.textContent=`${String(Math.floor(seconds/60)).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`},1000);
+    lifeAudio.clock=setInterval(()=>{const el=typeof lifeConvElement==='function'?lifeConvElement('life-mic-time'):document.getElementById('life-mic-time');if(!el)return;const seconds=Math.floor((Date.now()-lifeAudio.startedAt)/1000);el.textContent=`${String(Math.floor(seconds/60)).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`},1000);
     lifeAudio.timer=setTimeout(()=>{if(recorder.state==='recording')recorder.stop()},120000);
   }catch(e){
     life.phase='error';life.error=e.name==='NotAllowedError'?'麦克风没开，允许一下就好。':e.message||'没发启动录音';

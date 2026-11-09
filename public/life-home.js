@@ -16,12 +16,12 @@ function lifeGreeting(){const h=new Date().getHours();return h<6?'还没睡？':
 function lifeHome(){
   return lifeComposer()+lifeResult()+lifeTodayBlock()+lifePlansBlock()+lifeAdviceBlock();
 }
-function lifeResizeInput(input){input.style.height='auto';input.style.height=Math.min(input.scrollHeight,240)+'px';const send=input.closest('.composer')?.querySelector('[data-life-submit]');if(send)send.disabled=!input.value.trim()||['thinking','transcribing','listening'].includes(life.phase)}
+function lifeResizeInput(input){input.style.height='auto';input.style.height=Math.min(input.scrollHeight,240)+'px';const send=input.closest('.composer')?.querySelector('[data-life-submit]');if(send)send.disabled=!input.value.trim()||['thinking','transcribing','listening','applying'].includes(life.phase)}
 function lifeDraftInput(input){life.text=input.value;lifeResizeInput(input)}
 function submitLifeInput(button){const composer=button?.closest('.composer')||document.getElementById('life-input')?.closest('.composer'),input=composer?.querySelector('textarea'),text=String(input?.value||'').trim();if(!text||['thinking','transcribing','listening'].includes(life.phase))return;life.text=input.value;return lifeTurn(text)}
 function lifeComposer(){
- const busy=life.phase==='thinking'||life.phase==='transcribing',recording=life.phase==='listening';
- return `<section class="hero"><p class="hi">${lifeGreeting()}</p><h1>有什么想安排的吗？</h1><div class="composer ${recording?'is-recording':''}"><textarea id="life-input" rows="3" maxlength="4000" aria-label="想做的事" placeholder="跟我说说最近要做什么……比如：这周把论文改完，周六想休息" ${busy?'disabled':''} oninput="lifeDraftInput(this)" onkeydown="if(event.key==='Enter'&&(event.ctrlKey||event.metaKey)&&!event.isComposing){event.preventDefault();submitLifeInput(this.closest('.composer').querySelector('[data-life-submit]'))}"></textarea><div class="life-composer-actions"><button type="button" class="mic ${recording?'is-recording':''}" id="life-mic" onclick="lifeVoice()" aria-label="${recording?'结束录音':'语音输入'}" ${busy?'disabled':''}>${recording?'■':'🎙'}</button><button type="button" data-life-submit class="primary" aria-label="让 Life 帮我安排" onclick="submitLifeInput(this)" ${busy||recording||!life.text?.trim()?'disabled':''}>${life.phase==='thinking'?'正在整理…':'帮我安排'}</button></div></div><p class="phase ${life.phase==='error'?'is-error':''}" role="status">${esc(lifePhaseText())}${recording?' <span id="life-mic-time">00:00</span>':''}</p><small class="life-input-hint">Ctrl / ⌘ + Enter 提交，Enter 换行</small></section>`;
+ const busy=['thinking','transcribing','applying'].includes(life.phase),recording=life.phase==='listening';
+ return `<section class="hero"><p class="hi">${lifeGreeting()}</p><h1>有什么想安排的吗？</h1><p class="hero-description">把想法变成清楚的下一步，确认后再加入计划。</p><div class="composer ${recording?'is-recording':''}"><textarea id="life-input" rows="3" maxlength="4000" aria-label="想做的事" placeholder="跟我说说最近要做什么……比如：这周把论文改完，周六想休息" ${busy?'disabled':''} oninput="lifeDraftInput(this)" onkeydown="if(event.key==='Enter'&&(event.ctrlKey||event.metaKey)&&!event.isComposing){event.preventDefault();submitLifeInput(this.closest('.composer').querySelector('[data-life-submit]'))}"></textarea><div class="life-composer-actions"><button type="button" class="mic ${recording?'is-recording':''}" id="life-mic" onclick="lifeVoice()" aria-label="${recording?'结束录音':'语音输入'}" title="${recording?'结束录音':'语音输入'}" aria-pressed="${recording}" ${busy?'disabled':''}>${lifeIcon(recording?'stop':'mic')}</button><button type="button" data-life-submit class="primary" aria-label="让 Life 帮我安排" onclick="submitLifeInput(this)" ${busy||recording||!life.text?.trim()?'disabled':''}>${life.phase==='thinking'?'正在整理…':'帮我安排'}${lifeIcon('send')}</button></div></div><p class="phase ${life.phase==='error'?'is-error':''}" role="status">${esc(lifePhaseText())}${recording?' <span id="life-mic-time">00:00</span>':''}</p><small class="life-input-hint">Ctrl / ⌘ + Enter 提交，Enter 换行</small></section>`;
 }
 
 function lifeResult(){
@@ -37,12 +37,16 @@ function lifeResult(){
     :`<button class="primary" onclick="lifeDismiss()">知道了</button>`;
   return `<section class="result-panel" role="status"><div class="result-msg markdown-body">${renderMarkdown(r.message)}</div>${preview}${changes}<div class="row-actions">${actions}</div></section>`;
 }
+let lifeTodayExpanded=false;
+function lifeTodayRow(t,done=false){return `<li class="${done?'is-done':''}"><input type="checkbox" aria-label="完成 ${esc(t.title)}" ${done?'checked':''} onchange="productToggleTask('${t.id}',this.checked)"><div class="grow"><button type="button" class="link today-task-title" onclick="productTaskForm('${t.id}')"><strong>${esc(t.title)}</strong></button><small>${t.time?esc(t.time)+' · ':''}${t.estimatedMinutes?esc(t.estimatedMinutes)+' 分钟':done?'今天已完成':'今天'}${t.projectId?' · '+esc(project(t.projectId)?.title||''):''}</small></div></li>`}
 function lifeTodayBlock(){
-  const rows=lifeTodayTasks();
+  const rows=lifeTodayTasks(),visible=lifeTodayExpanded?rows:rows.slice(0,4);
+  const done=(data.tasks||[]).filter(t=>t.done&&String(t.completedAt||'').slice(0,10)===today());
   return `<section class="today product-primary">
-    <div class="ui-head"><h2>今天<span class="ui-count">${rows.length?rows.length+' 件':'没有安排'}</span></h2><button class="link" onclick="nav('plans')">全部计划 →</button></div>
-    ${rows.length?`<ul class="today-list">${rows.map(t=>`<li><input type="checkbox" aria-label="完成 ${esc(t.title)}" onchange="productToggleTask('${t.id}',this.checked)"><div class="grow"><strong>${esc(t.title)}</strong><small>${t.time?esc(t.time)+' · ':''}${t.estimatedMinutes?esc(t.estimatedMinutes)+' 分钟':'今天'}${t.projectId?' · '+esc(project(t.projectId)?.title||''):''}</small></div></li>`).join('')}</ul>`
-    :'<p class="quiet">今天还是空的。想做点什么，直接跟我说。</p>'}
+    <div class="ui-head"><h2>今天<span class="ui-count">${rows.length?rows.length+' 件待办':done.length?'已全部完成':'没有安排'}</span></h2><button class="link" onclick="nav('plans')">全部计划 ${lifeIcon('arrow')}</button></div>
+    ${rows.length?`<ul class="today-list">${visible.map(t=>lifeTodayRow(t)).join('')}</ul>${rows.length>4?`<button type="button" class="link today-expand" aria-expanded="${lifeTodayExpanded}" onclick="lifeTodayExpanded=!lifeTodayExpanded;render()">${lifeTodayExpanded?'收起':'展开全部 '+rows.length+' 件事'}</button>`:''}`
+    :`<p class="quiet">${done.length?'今天的安排都完成了，给自己留一点休息时间。':'今天还是空的。想做点什么，直接跟我说。'}</p>`}
+    ${done.length?`<details class="today-completed"><summary>今天已完成 ${done.length} 件</summary><ul class="today-list">${done.map(t=>lifeTodayRow(t,true)).join('')}</ul></details>`:''}
   </section>`;
 }
 function lifePlansBlock(){
